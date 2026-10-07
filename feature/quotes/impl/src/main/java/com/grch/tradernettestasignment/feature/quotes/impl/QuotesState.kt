@@ -30,7 +30,11 @@ data class QuotesState(
  * Display model for a single watchlist row.
  *
  * Fields are nullable until a quote arrives. [flash] is transient and cleared by
- * the ViewModel after the flash window elapses.
+ * the ViewModel after the flash window elapses. [minStep] is the security's
+ * minimum price increment; per the `min-step-price-formatting` spec it drives
+ * [lastPrice]/[change] formatting once known, and is `null` until the first
+ * quote frame for that ticker arrives (it is never sent on later partial
+ * updates, so it is merged like any other sparse field).
  */
 @Immutable
 data class QuoteRow(
@@ -41,6 +45,7 @@ data class QuoteRow(
     val change: Double? = null,
     val percentChange: Double? = null,
     val previousClose: Double? = null,
+    val minStep: Double? = null,
     val flash: FlashDirection = FlashDirection.NONE,
 )
 

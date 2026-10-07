@@ -18,6 +18,7 @@ internal fun QuotePayloadDto.toQuote(): Quote? {
         change = change,
         percentChange = percentChange,
         previousClose = previousClose,
+        minStep = minStep,
     )
 }
 

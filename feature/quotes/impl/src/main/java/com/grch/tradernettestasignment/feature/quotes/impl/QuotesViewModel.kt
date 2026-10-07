@@ -205,6 +205,7 @@ class QuotesViewModel @Inject constructor(
                 change = quote.change ?: row.change,
                 percentChange = quote.percentChange ?: row.percentChange,
                 previousClose = quote.previousClose ?: row.previousClose,
+                minStep = quote.minStep ?: row.minStep,
                 flash = if (direction != FlashDirection.NONE) direction else row.flash,
             )
             val rows = state.rows.toMutableList().apply { this[rowIndex] = merged }

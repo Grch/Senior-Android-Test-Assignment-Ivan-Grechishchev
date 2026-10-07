@@ -11,7 +11,9 @@ package com.grch.tradernettestasignment.feature.quotes.api.domain
  * (`https://tradernet.com/tradernet-api/quotes-get-changes/?site_lang=en`):
  * `c` -> [ticker], `ltr` -> [exchange], `name` -> [name], `ltp` -> [lastPrice],
  * `chg` -> [change] (signed points vs previous close), `pcp` -> [percentChange]
- * (percent vs previous close) and `pp` -> [previousClose].
+ * (percent vs previous close), `pp` -> [previousClose] and `min_step` ->
+ * [minStep] (the security's minimum price increment; live-verified to arrive
+ * only on a ticker's first frame, like [exchange] and [name]).
  */
 data class Quote(
     val ticker: String,
@@ -21,4 +23,5 @@ data class Quote(
     val change: Double? = null,
     val percentChange: Double? = null,
     val previousClose: Double? = null,
+    val minStep: Double? = null,
 )

@@ -5,9 +5,11 @@ import com.squareup.moshi.JsonClass
 
 /**
  * DTO for the named object at index 1 of the verified Tradernet `q` frame.
- * The documented fields (`c`, `ltr`, `name`, `ltp`, `chg`, `pcp`, `pp`) use
- * names rather than array positions, and all but the ticker remain nullable
- * because later quote frames may contain partial updates.
+ * The documented fields (`c`, `ltr`, `name`, `ltp`, `chg`, `pcp`, `pp`,
+ * `min_step`) use names rather than array positions, and all but the ticker
+ * remain nullable because later quote frames may contain partial updates;
+ * `min_step` in particular is live-verified to arrive only on a ticker's
+ * first frame.
  */
 @JsonClass(generateAdapter = true)
 data class QuotePayloadDto(
@@ -18,6 +20,7 @@ data class QuotePayloadDto(
     @param:Json(name = "chg") val change: Double? = null,
     @param:Json(name = "pcp") val percentChange: Double? = null,
     @param:Json(name = "pp") val previousClose: Double? = null,
+    @param:Json(name = "min_step") val minStep: Double? = null,
 )
 
 /** The semantically relevant values extracted from the array-shaped wire frame. */

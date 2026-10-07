@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import java.math.BigDecimal
+import java.math.RoundingMode
 
 private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
@@ -137,14 +138,14 @@ private fun QuoteRowItem(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = row.lastPrice?.let(::formatValue) ?: PLACEHOLDER,
+                        text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     row.change?.let { change ->
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "(${formatSigned(change)})",
+                            text = "(${formatSignedPrice(change, row.minStep)})",
                             style = MaterialTheme.typography.bodySmall,
                             color = signColor(change),
                         )
@@ -217,6 +218,33 @@ private fun formatSigned(value: Double): String {
 private fun formatValue(value: Double): String =
     BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
 
+/**
+ * Formats a price-scale value (last price or its points delta) per the
+ * `min-step-price-formatting` spec: when [minStep] is known, round to its
+ * nearest multiple and pad to exactly its own decimal-place count; otherwise
+ * fall back to the board's default trailing-zero-stripped display.
+ */
+private fun formatPrice(value: Double, minStep: Double?): String =
+    if (minStep != null && minStep > 0.0) roundToMinStep(value, minStep).toPlainString() else formatValue(value)
+
+private fun formatSignedPrice(value: Double, minStep: Double?): String {
+    val sign = if (value > 0) "+" else ""
+    return sign + formatPrice(value, minStep)
+}
+
+/**
+ * Rounds [value] to the nearest multiple of [minStep] and scales the result
+ * to [minStep]'s own decimal-place count (its scale after stripping trailing
+ * zeros), so e.g. a 0.0001 step always yields 4 decimal places, even if some
+ * are zero.
+ */
+private fun roundToMinStep(value: Double, minStep: Double): BigDecimal {
+    val step = BigDecimal.valueOf(minStep)
+    val decimalPlaces = step.stripTrailingZeros().scale().coerceAtLeast(0)
+    val steps = BigDecimal.valueOf(value).divide(step, 0, RoundingMode.HALF_UP)
+    return steps.multiply(step).setScale(decimalPlaces, RoundingMode.HALF_UP)
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun QuotesScreenPreview() {
@@ -231,6 +259,7 @@ private fun QuotesScreenPreview() {
                         lastPrice = 333.23,
                         change = -0.87,
                         percentChange = -0.26,
+                        minStep = 0.01,
                         flash = FlashDirection.DOWN,
                     ),
                     QuoteRow(
@@ -240,7 +269,17 @@ private fun QuotesScreenPreview() {
                         lastPrice = 7839.86,
                         change = 16.41,
                         percentChange = 0.21,
+                        minStep = 0.01,
                         flash = FlashDirection.UP,
+                    ),
+                    QuoteRow(
+                        ticker = "TGKA",
+                        exchange = "MCX",
+                        name = "ПАО ТГК-1",
+                        lastPrice = 0.004358,
+                        change = 0.000006,
+                        percentChange = 0.14,
+                        minStep = 0.000002,
                     ),
                     QuoteRow(ticker = "AI.US"),
                 ),

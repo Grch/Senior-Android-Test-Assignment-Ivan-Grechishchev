@@ -26,14 +26,16 @@ import kotlinx.coroutines.launch
  * runs only while the app is foreground AND the screen is visible; either turning
  * `false` cancels collection. Socket retries are owned by the data layer.
  *
- * Source policy (agreed): the top-securities API is requested by default every
- * time the quotes screen opens (the rising edge of
- * [QuotesAction.OnScreenVisibilityChanged]). While the request is in flight the
- * current active set (the fixed list on first open) keeps rendering. A non-empty
- * success replaces the active set and rows in API order; any failure or an empty
- * response keeps the exact fixed list as the active set. There is no toggle,
- * persisted preference, or build flag. Changing the active set cancels and
- * reconnects/resubscribes the same verified one-frame format.
+ * Source policy (agreed): the required [FixedTickers] watchlist is always part of
+ * the active set, in its required order. The top-securities API is requested by
+ * default every time the quotes screen opens (the rising edge of
+ * [QuotesAction.OnScreenVisibilityChanged]) to augment it: any ticker the API
+ * returns that is not already in the fixed list is appended, in API order, after
+ * the fixed rows. A failure, an empty response, or a response containing only
+ * tickers already in the fixed list leaves the fixed list as the whole active
+ * set. There is no toggle, persisted preference, or build flag. Changing the
+ * active set cancels and reconnects/resubscribes the same verified one-frame
+ * format.
  */
 @HiltViewModel
 class QuotesViewModel @Inject constructor(
@@ -74,24 +76,46 @@ class QuotesViewModel @Inject constructor(
         get() = isForeground && isScreenVisible
 
     /**
-     * Requests the top-securities API for a fresh active ticker set. Runs once per
-     * screen open; a newer open cancels an in-flight request. On a non-empty
-     * success the API IDs replace the active set and rows in API order; on any
-     * failure or an empty response the exact fixed list remains the active set.
+     * Requests the top-securities API to augment the fixed active ticker set.
+     * Runs once per screen open; a newer open cancels an in-flight request. Any
+     * distinct API ticker not already in [FixedTickers.ALL] is appended, in API
+     * order, after the fixed rows; a failure, an empty response, or a response
+     * with no tickers beyond the fixed list leaves the exact fixed list as the
+     * active set. API `details` names are applied to matching rows (fixed or
+     * appended) regardless of whether any ticker was actually appended.
      */
     private fun requestTopSecurities() {
         sourceJob?.cancel()
         sourceJob = viewModelScope.launch {
             when (val result = topSecuritiesDataSource.fetchTopSecurities()) {
                 is TopSecuritiesResult.Success -> {
-                    Log.d(TAG, "top-securities applied: ${result.securities.size} tickers")
-                    applyActiveSet(
-                        tickers = result.securities.map { it.ticker },
-                        names = result.securities
-                            .mapNotNull { ref -> ref.name?.let { ref.ticker to it } }
-                            .toMap(),
-                        source = QuoteSource.TOP_SECURITIES,
-                    )
+                    // All API-supplied names (including for tickers already in the
+                    // fixed list, e.g. Russian blue chips) are kept so applyActiveSet
+                    // can fill a blank fixed-row name; only the active ticker set
+                    // itself is restricted to tickers beyond the fixed list.
+                    val names = result.securities
+                        .mapNotNull { ref -> ref.name?.let { ref.ticker to it } }
+                        .toMap()
+                    val fixedSet = FixedTickers.ALL.toHashSet()
+                    val additions = result.securities
+                        .map { it.ticker }
+                        .filter { it !in fixedSet }
+                        .distinct()
+                    if (additions.isEmpty()) {
+                        Log.d(TAG, "top-securities: no tickers beyond the fixed list")
+                        applyActiveSet(
+                            tickers = FixedTickers.ALL,
+                            names = names,
+                            source = QuoteSource.FIXED,
+                        )
+                    } else {
+                        Log.d(TAG, "top-securities applied: ${additions.size} tickers added")
+                        applyActiveSet(
+                            tickers = FixedTickers.ALL + additions,
+                            names = names,
+                            source = QuoteSource.AUGMENTED,
+                        )
+                    }
                 }
 
                 is TopSecuritiesResult.Failure -> {
@@ -166,18 +190,14 @@ class QuotesViewModel @Inject constructor(
     }
 
     private fun mergeQuote(quote: Quote) {
-        val current = _state.value
-        val index = current.rows.indexOfFirst { it.ticker == quote.ticker }
-        // Spec: never add a ticker outside the current active set.
-        if (index == -1) return
-
-        val previous = current.rows[index]
-        val direction = directionalChange(previous.lastPrice, quote.lastPrice)
-
+        var direction = FlashDirection.NONE
         _state.update { state ->
+            direction = FlashDirection.NONE
             val rowIndex = state.rows.indexOfFirst { it.ticker == quote.ticker }
+            // Spec: never add a ticker outside the current active set.
             if (rowIndex == -1) return@update state
             val row = state.rows[rowIndex]
+            direction = directionalChange(row.lastPrice, quote.lastPrice)
             val merged = row.copy(
                 exchange = quote.exchange ?: row.exchange,
                 name = quote.name ?: row.name,

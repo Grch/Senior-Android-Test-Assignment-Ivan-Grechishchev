@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -188,6 +189,7 @@ private fun Chevron(modifier: Modifier = Modifier) {
 }
 
 @Composable
+@ReadOnlyComposable
 private fun signColor(value: Double?): Color = when {
     value == null -> MaterialTheme.colorScheme.onSurfaceVariant
     value > 0 -> PositiveGreen

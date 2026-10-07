@@ -43,7 +43,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.okhttp)
     implementation(libs.moshi)
-    implementation(libs.moshi.kotlin)
+    ksp(libs.moshi.kotlin.codegen)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

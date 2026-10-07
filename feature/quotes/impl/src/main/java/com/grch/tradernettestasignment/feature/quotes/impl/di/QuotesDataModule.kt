@@ -12,7 +12,6 @@ import com.grch.tradernettestasignment.feature.quotes.impl.data.TradernetTopSecu
 import com.grch.tradernettestasignment.feature.quotes.impl.data.TradernetUrls
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.Binds
@@ -57,9 +56,7 @@ abstract class QuotesDataModule {
 
         @Provides
         @Singleton
-        fun provideMoshi(): Moshi = Moshi.Builder()
-            .addLast(KotlinJsonAdapterFactory())
-            .build()
+        fun provideMoshi(): Moshi = Moshi.Builder().build()
 
         @Provides
         @Singleton

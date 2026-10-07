@@ -1,5 +1,7 @@
 package com.grch.tradernettestasignment.feature.quotes.impl
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,9 +41,8 @@ import java.math.BigDecimal
 
 private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
-private val FlashUp = Color(0x331E9E5A)
-private val FlashDown = Color(0x33D64545)
 private const val PLACEHOLDER = "—"
+private const val FLASH_ANIMATION_MS = 150
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports app
@@ -105,11 +107,7 @@ private fun QuoteRowItem(
     row: QuoteRow,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(row.flash.background()),
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -136,11 +134,10 @@ private fun QuoteRowItem(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Text(
+                PercentBadge(
                     text = row.percentChange?.let(::formatPercent) ?: PLACEHOLDER,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = signColor(row.percentChange),
+                    sign = row.percentChange,
+                    flash = row.flash,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -188,6 +185,45 @@ private fun Chevron(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * The percent-change value, highlighted on a tick: a quick color fade from
+ * plain sign-colored text to a solid green/red pill with white text while
+ * [flash] is active, then back. Only this badge highlights — not the row.
+ */
+@Composable
+private fun PercentBadge(
+    text: String,
+    sign: Double?,
+    flash: FlashDirection,
+    modifier: Modifier = Modifier,
+) {
+    val targetBackground = when (flash) {
+        FlashDirection.UP -> PositiveGreen
+        FlashDirection.DOWN -> NegativeRed
+        FlashDirection.NONE -> Color.Transparent
+    }
+    val background by animateColorAsState(
+        targetValue = targetBackground,
+        animationSpec = tween(FLASH_ANIMATION_MS),
+        label = "percentBadgeBackground",
+    )
+    val targetTextColor = if (flash == FlashDirection.NONE) signColor(sign) else Color.White
+    val textColor by animateColorAsState(
+        targetValue = targetTextColor,
+        animationSpec = tween(FLASH_ANIMATION_MS),
+        label = "percentBadgeText",
+    )
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = textColor,
+        modifier = modifier
+            .background(background, RoundedCornerShape(percent = 50))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
 @Composable
 @ReadOnlyComposable
 private fun signColor(value: Double?): Color = when {
@@ -195,12 +231,6 @@ private fun signColor(value: Double?): Color = when {
     value > 0 -> PositiveGreen
     value < 0 -> NegativeRed
     else -> MaterialTheme.colorScheme.onSurface
-}
-
-private fun FlashDirection.background(): Color = when (this) {
-    FlashDirection.UP -> FlashUp
-    FlashDirection.DOWN -> FlashDown
-    FlashDirection.NONE -> Color.Transparent
 }
 
 private fun formatPercent(value: Double): String = formatSigned(value) + "%"

@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -116,15 +117,21 @@ fun QuotesScreen(
     modifier: Modifier = Modifier,
 ) {
     when (state.boardStatus) {
-        BoardStatus.LOADING -> QuotesLoadingBoard(modifier = modifier)
         BoardStatus.ERROR -> QuotesErrorBoard(
             onRetryClick = { onAction(QuotesAction.OnRetryClicked) },
             modifier = modifier,
         )
         BoardStatus.CONTENT -> {
+            // Tickers are known upfront (the fixed list, plus whatever the
+            // top-securities augmentation already settled on), so the real rows
+            // render immediately; a row only shimmers the specific fields it
+            // hasn't received a quote for yet, rather than hiding the whole list
+            // behind a generic loading screen. The shimmer brush is shared and
+            // created only while at least one row still needs it.
+            val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
             LazyColumn(modifier = modifier.fillMaxSize()) {
                 items(items = state.rows, key = { row -> row.ticker }) { row ->
-                    QuoteRowItem(row = row)
+                    QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
                 }
             }
         }
@@ -158,11 +165,19 @@ private fun QuotesErrorBoard(
     }
 }
 
+/**
+ * A single watchlist row. While [row] has no [QuoteRow.lastPrice] yet (no quote
+ * frame has arrived for it), the name/exchange line and the whole price area
+ * shimmer using [shimmerBrush] instead of showing a dash — the ticker itself is
+ * always known upfront, so only it and the logo render immediately either way.
+ */
 @Composable
 private fun QuoteRowItem(
     row: QuoteRow,
+    shimmerBrush: Brush?,
     modifier: Modifier = Modifier,
 ) {
+    val isPending = row.lastPrice == null
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -180,7 +195,15 @@ private fun QuoteRowItem(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 val secondary = listOfNotNull(row.exchange, row.name).joinToString(" · ")
-                if (secondary.isNotEmpty()) {
+                if (isPending) {
+                    ShimmerBlock(
+                        brush = shimmerBrush,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .fillMaxWidth(0.55f)
+                            .height(12.dp),
+                    )
+                } else if (secondary.isNotEmpty()) {
                     Text(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
@@ -191,25 +214,32 @@ private fun QuoteRowItem(
                 }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                PercentBadge(
-                    text = row.percentChange?.let(::formatPercent) ?: PLACEHOLDER,
-                    sign = row.percentChange,
-                    flash = row.flash,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
+            if (isPending) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ShimmerBlock(brush = shimmerBrush, modifier = Modifier.width(52.dp).height(20.dp))
+                    ShimmerBlock(brush = shimmerBrush, modifier = Modifier.width(72.dp).height(14.dp))
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    PercentBadge(
+                        text = row.percentChange?.let(::formatPercent) ?: PLACEHOLDER,
+                        sign = row.percentChange,
+                        flash = row.flash,
                     )
-                    row.change?.let { change ->
-                        Spacer(modifier = Modifier.width(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "(${formatSignedPrice(change, row.minStep)})",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = signColor(change),
+                            text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
+                        row.change?.let { change ->
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "(${formatSignedPrice(change, row.minStep)})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = signColor(change),
+                            )
+                        }
                     }
                 }
             }
@@ -223,27 +253,13 @@ private fun QuoteRowItem(
 
 private const val SHIMMER_ANIMATION_MS = 1100
 private const val SHIMMER_SWEEP_WIDTH = 600f
-private const val PLACEHOLDER_ROW_COUNT = 10
 
 /**
- * Loading placeholder shown before the board has ever received data: rows of
- * shimmering blocks shaped like a real [QuoteRowItem], so the real content
- * doesn't pop in against bare text the way it would starting from blank/dash
- * rows. One shared [rememberShimmerBrush] drives every block so the sweep
- * reads as a single light pass over the whole screen, per the standard
- * Compose approach (an infinite-transition-driven gradient `Brush`, no extra
- * dependency) rather than a per-row animation.
+ * A single shared shimmer `Brush`, animated by one [rememberInfiniteTransition]
+ * so every pending row's blocks sweep in sync — the standard Compose approach
+ * (an infinite-transition-driven gradient, no extra dependency) kept subtle
+ * with a low, narrow-alpha-range gradient rather than a bright highlight.
  */
-@Composable
-private fun QuotesLoadingBoard(modifier: Modifier = Modifier) {
-    val brush = rememberShimmerBrush()
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(PLACEHOLDER_ROW_COUNT) {
-            QuoteRowPlaceholder(brush = brush)
-        }
-    }
-}
-
 @Composable
 private fun rememberShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
@@ -264,45 +280,17 @@ private fun rememberShimmerBrush(): Brush {
     )
 }
 
+/**
+ * [brush] is only ever null when no row in the list is pending, in which case
+ * no [QuoteRowItem] renders a [ShimmerBlock] in the first place; the solid
+ * fallback only guards against that invariant being violated.
+ */
 @Composable
-private fun QuoteRowPlaceholder(brush: Brush, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ShimmerBlock(
-                brush = brush,
-                modifier = Modifier
-                    .size(LogoSize)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ShimmerBlock(brush = brush, modifier = Modifier.fillMaxWidth(0.35f).height(16.dp))
-                ShimmerBlock(brush = brush, modifier = Modifier.fillMaxWidth(0.55f).height(12.dp))
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ShimmerBlock(brush = brush, modifier = Modifier.width(52.dp).height(20.dp))
-                ShimmerBlock(brush = brush, modifier = Modifier.width(72.dp).height(14.dp))
-            }
-        }
-        HorizontalDivider(
-            modifier = Modifier.padding(start = 16.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-    }
-}
-
-@Composable
-private fun ShimmerBlock(brush: Brush, modifier: Modifier = Modifier) {
+private fun ShimmerBlock(brush: Brush?, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(brush),
+            .background(brush ?: SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))),
     )
 }
 
@@ -484,12 +472,13 @@ private fun QuotesScreenPreview() {
     }
 }
 
+/** Cold start: every fixed-list row seeded but still pending (no quote yet). */
 @Preview(showBackground = true)
 @Composable
-private fun QuotesScreenLoadingPreview() {
+private fun QuotesScreenPendingPreview() {
     MaterialTheme {
         QuotesScreen(
-            state = QuotesState(boardStatus = BoardStatus.LOADING),
+            state = QuotesState(),
             onAction = {},
         )
     }

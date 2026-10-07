@@ -38,11 +38,12 @@ import kotlinx.coroutines.launch
  * active set cancels and reconnects/resubscribes the same verified one-frame
  * format.
  *
- * [QuotesState.boardStatus] starts at [BoardStatus.LOADING], moves to
- * [BoardStatus.CONTENT] on the first quote merged from any source and stays
- * there, and only moves to [BoardStatus.ERROR] if the socket disconnects
- * before any quote has ever arrived — a genuine first-connection failure, not
- * a transient reconnect once the board already has something to show.
+ * [QuotesState.boardStatus] starts at [BoardStatus.CONTENT] — rows render
+ * immediately, each shimmering only the fields it doesn't have yet — and only
+ * moves to [BoardStatus.ERROR] if the socket disconnects before any quote has
+ * ever arrived for any row: a genuine first-connection failure, not a
+ * transient reconnect once the board already has something to show. The first
+ * quote merged from any source moves it back to [BoardStatus.CONTENT].
  */
 @HiltViewModel
 class QuotesViewModel @Inject constructor(
@@ -79,9 +80,11 @@ class QuotesViewModel @Inject constructor(
             }
 
             QuotesAction.OnRetryClicked -> {
-                // A manual nudge: show the shimmer again and reconnect right away,
-                // bypassing the data layer's own retry delay.
-                _state.update { it.copy(boardStatus = BoardStatus.LOADING) }
+                // A manual nudge: leave the error placeholder and reconnect right
+                // away, bypassing the data layer's own retry delay. Rows already
+                // carry whatever they had before, and keep shimmering any field
+                // that's still unknown.
+                _state.update { it.copy(boardStatus = BoardStatus.CONTENT) }
                 restartStreaming()
             }
         }

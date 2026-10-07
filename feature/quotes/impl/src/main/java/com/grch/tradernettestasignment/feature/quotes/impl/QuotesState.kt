@@ -24,21 +24,27 @@ data class QuotesState(
     val isStreaming: Boolean = false,
     /** The active source chosen by the API-on-screen-open policy. */
     val source: QuoteSource = QuoteSource.FIXED,
-    /** What the screen should render: a loading shimmer, the error placeholder, or [rows]. */
-    val boardStatus: BoardStatus = BoardStatus.LOADING,
+    /**
+     * What the screen should render. [rows] (tickers and symbols are known
+     * upfront, so [BoardStatus.CONTENT] renders immediately — each row shimmers
+     * only the specific fields it doesn't have yet) or the full-screen error
+     * placeholder in [BoardStatus.ERROR].
+     */
+    val boardStatus: BoardStatus = BoardStatus.CONTENT,
 )
 
 /** See [QuotesViewModel]'s class doc for the exact state machine. */
 enum class BoardStatus {
-    LOADING,
-    ERROR,
     CONTENT,
+    ERROR,
 }
 
 /**
  * Display model for a single watchlist row.
  *
- * Fields are nullable until a quote arrives. [flash] is transient and cleared by
+ * Fields are nullable until a quote arrives — a row with a `null` [lastPrice]
+ * has never received any quote frame yet and renders with its price-area
+ * fields shimmering rather than a dash. [flash] is transient and cleared by
  * the ViewModel after the flash window elapses. [minStep] is the security's
  * minimum price increment; per the `min-step-price-formatting` spec it drives
  * [lastPrice]/[change] formatting once known, and is `null` until the first

@@ -7,10 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.grch.tradernettestasignment.feature.quotes.api.QuotesEntryPoint
+import com.grch.tradernettestasignment.feature.quotes.impl.DefaultQuotesEntryPoint
 import com.grch.tradernettestasignment.ui.theme.TradernetTestAsignmentTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +20,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TradernetTestAsignmentTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                AppRoot()
             }
         }
     }
 }
 
+/**
+ * Composition root: the only place that binds the concrete quotes implementation
+ * from `:feature:quotes:impl` to the public `:feature:quotes:api` entry contract.
+ *
+ * The app hosts the quotes destination directly; the foundation deliberately
+ * does not add a navigation framework.
+ */
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun GreetingPreview() {
-    TradernetTestAsignmentTheme {
-        Greeting("Android")
+private fun AppRoot(modifier: Modifier = Modifier) {
+    val quotesEntryPoint: QuotesEntryPoint = remember { DefaultQuotesEntryPoint() }
+    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+        quotesEntryPoint.Content(modifier = Modifier.padding(innerPadding))
     }
 }

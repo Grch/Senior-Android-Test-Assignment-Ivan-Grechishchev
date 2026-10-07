@@ -36,6 +36,11 @@ android {
 }
 
 dependencies {
+    // Composition-root exception: :app is the only module allowed to depend on
+    // the concrete quotes implementation, and it binds it to the public API.
+    implementation(project(":feature:quotes:api"))
+    implementation(project(":feature:quotes:impl"))
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

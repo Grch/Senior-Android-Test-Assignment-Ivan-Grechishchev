@@ -24,4 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Tradernet Test Asignment"
 include(":app")
+include(":feature:quotes:api")
+include(":feature:quotes:impl")
  

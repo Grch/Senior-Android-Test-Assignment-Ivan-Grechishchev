@@ -34,3 +34,6 @@ local.properties
 
 # Personal opencode skills/agents
 /.opencode/
+
+# OpenSpec (local tooling/artifacts)
+/openspec/

@@ -24,7 +24,16 @@ data class QuotesState(
     val isStreaming: Boolean = false,
     /** The active source chosen by the API-on-screen-open policy. */
     val source: QuoteSource = QuoteSource.FIXED,
+    /** What the screen should render: a loading shimmer, the error placeholder, or [rows]. */
+    val boardStatus: BoardStatus = BoardStatus.LOADING,
 )
+
+/** See [QuotesViewModel]'s class doc for the exact state machine. */
+enum class BoardStatus {
+    LOADING,
+    ERROR,
+    CONTENT,
+}
 
 /**
  * Display model for a single watchlist row.

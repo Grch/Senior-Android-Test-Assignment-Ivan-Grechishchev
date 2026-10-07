@@ -11,8 +11,13 @@ package com.grch.tradernettestasignment.feature.quotes.impl
  * point for the top-securities source: the ViewModel requests the API every time
  * the quotes screen opens. There is no source-selection action, toggle, or
  * persisted preference.
+ *
+ * [OnRetryClicked] is dispatched only from the error placeholder's "Try again"
+ * button, shown when the board has never received any data and the socket is
+ * disconnected.
  */
 sealed interface QuotesAction {
     data class OnAppForegroundChanged(val isForeground: Boolean) : QuotesAction
     data class OnScreenVisibilityChanged(val isVisible: Boolean) : QuotesAction
+    data object OnRetryClicked : QuotesAction
 }

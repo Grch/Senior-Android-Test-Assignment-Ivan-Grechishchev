@@ -1,20 +1,27 @@
 package com.grch.tradernettestasignment.feature.quotes.impl
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,9 +36,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -106,9 +115,45 @@ fun QuotesScreen(
     onAction: (QuotesAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(items = state.rows, key = { row -> row.ticker }) { row ->
-            QuoteRowItem(row = row)
+    when (state.boardStatus) {
+        BoardStatus.LOADING -> QuotesLoadingBoard(modifier = modifier)
+        BoardStatus.ERROR -> QuotesErrorBoard(
+            onRetryClick = { onAction(QuotesAction.OnRetryClicked) },
+            modifier = modifier,
+        )
+        BoardStatus.CONTENT -> {
+            LazyColumn(modifier = modifier.fillMaxSize()) {
+                items(items = state.rows, key = { row -> row.ticker }) { row ->
+                    QuoteRowItem(row = row)
+                }
+            }
+        }
+    }
+}
+
+/** Full-screen placeholder shown when the socket has never delivered any data. */
+@Composable
+private fun QuotesErrorBoard(
+    onRetryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Oops, seems we've got an error",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(onClick = onRetryClick) {
+            Text("Try again")
         }
     }
 }
@@ -174,6 +219,91 @@ private fun QuoteRowItem(
             color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
+}
+
+private const val SHIMMER_ANIMATION_MS = 1100
+private const val SHIMMER_SWEEP_WIDTH = 600f
+private const val PLACEHOLDER_ROW_COUNT = 10
+
+/**
+ * Loading placeholder shown before the board has ever received data: rows of
+ * shimmering blocks shaped like a real [QuoteRowItem], so the real content
+ * doesn't pop in against bare text the way it would starting from blank/dash
+ * rows. One shared [rememberShimmerBrush] drives every block so the sweep
+ * reads as a single light pass over the whole screen, per the standard
+ * Compose approach (an infinite-transition-driven gradient `Brush`, no extra
+ * dependency) rather than a per-row animation.
+ */
+@Composable
+private fun QuotesLoadingBoard(modifier: Modifier = Modifier) {
+    val brush = rememberShimmerBrush()
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        items(PLACEHOLDER_ROW_COUNT) {
+            QuoteRowPlaceholder(brush = brush)
+        }
+    }
+}
+
+@Composable
+private fun rememberShimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translate by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(SHIMMER_ANIMATION_MS, easing = LinearEasing),
+        ),
+        label = "shimmerTranslate",
+    )
+    val base = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val highlight = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    return Brush.horizontalGradient(
+        colors = listOf(base, highlight, base),
+        startX = (translate - 0.5f) * SHIMMER_SWEEP_WIDTH,
+        endX = (translate + 0.5f) * SHIMMER_SWEEP_WIDTH,
+    )
+}
+
+@Composable
+private fun QuoteRowPlaceholder(brush: Brush, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ShimmerBlock(
+                brush = brush,
+                modifier = Modifier
+                    .size(LogoSize)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ShimmerBlock(brush = brush, modifier = Modifier.fillMaxWidth(0.35f).height(16.dp))
+                ShimmerBlock(brush = brush, modifier = Modifier.fillMaxWidth(0.55f).height(12.dp))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                ShimmerBlock(brush = brush, modifier = Modifier.width(52.dp).height(20.dp))
+                ShimmerBlock(brush = brush, modifier = Modifier.width(72.dp).height(14.dp))
+            }
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 16.dp),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
+}
+
+@Composable
+private fun ShimmerBlock(brush: Brush, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(brush),
+    )
 }
 
 /**
@@ -347,7 +477,30 @@ private fun QuotesScreenPreview() {
                     ),
                     QuoteRow(ticker = "AI.US"),
                 ),
+                boardStatus = BoardStatus.CONTENT,
             ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenLoadingPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(boardStatus = BoardStatus.LOADING),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenErrorPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(boardStatus = BoardStatus.ERROR),
             onAction = {},
         )
     }

@@ -18,24 +18,37 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import javax.inject.Inject
 
+/** A connection lifecycle signal or a raw text frame from the Tradernet socket. */
+internal sealed interface SocketEvent {
+    data class Frame(val text: String) : SocketEvent
+    data object Opened : SocketEvent
+    data object Closed : SocketEvent
+}
+
 /** Owns the raw, unauthenticated Tradernet WebSocket connection and its retries. */
 class WebSocketRemoteDataSource @Inject constructor(
     private val client: OkHttpClient,
 ) {
-    /** Emits unmodified text frames and reconnects after a disconnect while collected. */
-    fun observeFrames(tickers: List<String>): Flow<String> = flow {
+    /**
+     * Emits connection lifecycle events and unmodified text frames, reconnecting
+     * after a disconnect while collected. [SocketEvent.Closed] is emitted after
+     * every ended attempt, whether or not it ever reached [SocketEvent.Opened] —
+     * callers use it to detect a failed/no-network first attempt.
+     */
+    internal fun observeFrames(tickers: List<String>): Flow<SocketEvent> = flow {
         while (currentCoroutineContext().isActive) {
             openConnection(tickers)
                 .catch { failure ->
                     if (failure is CancellationException) throw failure
                     Log.d(TAG, "socket ended: ${failure.message}")
                 }
-                .collect { frame -> emit(frame) }
+                .collect { event -> emit(event) }
+            emit(SocketEvent.Closed)
             if (currentCoroutineContext().isActive) delay(RECONNECT_DELAY_MS)
         }
     }
 
-    private fun openConnection(tickers: List<String>): Flow<String> = callbackFlow {
+    private fun openConnection(tickers: List<String>): Flow<SocketEvent> = callbackFlow {
         val request = Request.Builder()
             .url(TradernetUrls.SOCKET_URL)
             .build()
@@ -43,11 +56,12 @@ class WebSocketRemoteDataSource @Inject constructor(
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "socket open")
+                trySend(SocketEvent.Opened)
                 webSocket.send(subscriptionFrame(tickers))
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                trySend(text)
+                trySend(SocketEvent.Frame(text))
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {

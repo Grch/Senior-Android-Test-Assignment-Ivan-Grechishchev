@@ -35,6 +35,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
+    // Networking boundary: Retrofit for later REST capability and OkHttp for the
+    // live quotes WebSocket. Both stay inside the feature implementation.
+    implementation(libs.retrofit)
+    implementation(libs.okhttp)
+
     lintChecks(libs.slack.compose.lint.checks)
 
     debugImplementation(libs.androidx.compose.ui.tooling)

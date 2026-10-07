@@ -3,12 +3,14 @@ package com.grch.tradernettestasignment.feature.quotes.impl
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,9 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,12 +40,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.grch.tradernettestasignment.feature.quotes.impl.data.TradernetUrls
 import java.math.BigDecimal
 
 private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_ANIMATION_MS = 150
+private val LogoSize = 36.dp
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports app
@@ -110,6 +124,8 @@ private fun QuoteRowItem(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SecurityLogo(ticker = row.ticker, modifier = Modifier.padding(end = 12.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = row.ticker,
@@ -155,6 +171,54 @@ private fun QuoteRowItem(
         HorizontalDivider(
             modifier = Modifier.padding(start = 16.dp),
             color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
+}
+
+/**
+ * A security's logo on a neutral monogram tile. The monogram shows only while
+ * no real logo is displayed: during loading, on a load failure, and on
+ * Tradernet's own "no logo" response (a 1x1 fully transparent GIF, not an HTTP
+ * error — see [TradernetUrls.logoUrl]), detected by its 1x1 intrinsic size
+ * since it otherwise reports as a successful load. Once a real logo loads, the
+ * monogram is removed rather than left underneath, since most brand logos have
+ * a transparent background and would otherwise show both at once.
+ */
+@Composable
+private fun SecurityLogo(ticker: String, modifier: Modifier = Modifier) {
+    var showPlaceholder by remember(ticker) { mutableStateOf(true) }
+    Box(
+        modifier = modifier
+            .size(LogoSize)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (showPlaceholder) {
+            Text(
+                text = ticker.take(1).uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        AsyncImage(
+            model = ImageRequest.Builder(LocalPlatformContext.current)
+                .data(TradernetUrls.logoUrl(ticker))
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            modifier = Modifier.size(LogoSize),
+            contentScale = ContentScale.Fit,
+            onState = { state ->
+                showPlaceholder = when (state) {
+                    is AsyncImagePainter.State.Success -> {
+                        val size = state.painter.intrinsicSize
+                        size.width <= 1f || size.height <= 1f
+                    }
+                    else -> true
+                }
+            },
         )
     }
 }

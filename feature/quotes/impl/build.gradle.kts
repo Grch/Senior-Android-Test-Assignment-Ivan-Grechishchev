@@ -45,5 +45,8 @@ dependencies {
     implementation(libs.moshi)
     ksp(libs.moshi.kotlin.codegen)
 
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

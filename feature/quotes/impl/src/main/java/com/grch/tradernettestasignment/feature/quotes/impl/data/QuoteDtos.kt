@@ -9,7 +9,7 @@ import com.squareup.moshi.JsonClass
  * names rather than array positions, and all but the ticker remain nullable
  * because later quote frames may contain partial updates.
  */
-@JsonClass(generateAdapter = false)
+@JsonClass(generateAdapter = true)
 data class QuotePayloadDto(
     @param:Json(name = "c") val ticker: String? = null,
     @param:Json(name = "ltr") val exchange: String? = null,
@@ -26,7 +26,7 @@ data class QuoteFrameDto(
     val payload: QuotePayloadDto?,
 )
 
-@JsonClass(generateAdapter = false)
+@JsonClass(generateAdapter = true)
 data class TopSecuritiesResponseDto(
     @param:Json(name = "tickers") val tickers: List<Any?>? = null,
     @param:Json(name = "details") val details: Map<String, TopSecurityDetailsDto>? = null,
@@ -35,7 +35,7 @@ data class TopSecuritiesResponseDto(
     @param:Json(name = "errMsg") val errorMessage: Any? = null,
 )
 
-@JsonClass(generateAdapter = false)
+@JsonClass(generateAdapter = true)
 data class TopSecurityDetailsDto(
     @param:Json(name = "name") val name: Any? = null,
 )

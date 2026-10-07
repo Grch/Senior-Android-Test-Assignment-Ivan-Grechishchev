@@ -62,7 +62,6 @@ class TradernetTopSecuritiesDataSource @Inject constructor(
             Log.d(TAG, "parse failure: ${json.message}")
             TopSecuritiesResult.Failure(TopSecuritiesError.PARSE)
         } catch (exception: Exception) {
-            if (exception is CancellationException) throw exception
             Log.d(TAG, "parse failure: ${exception.message}")
             TopSecuritiesResult.Failure(TopSecuritiesError.PARSE)
         }

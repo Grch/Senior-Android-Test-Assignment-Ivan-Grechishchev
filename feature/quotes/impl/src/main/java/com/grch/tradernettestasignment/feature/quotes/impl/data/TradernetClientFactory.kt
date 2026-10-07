@@ -8,8 +8,8 @@ import retrofit2.Retrofit
  * Process-wide Tradernet networking boundary.
  *
  * The single [OkHttpClient] backs both the live quotes WebSocket (via
- * [TradernetQuoteSocketDataSource]) and the [retrofit] instance reserved for the
- * later REST capability. No authentication or credential interceptor is
+ * [TradernetQuoteSocketDataSource]) and the [retrofit] instance used for the
+ * top-securities REST capability. No authentication or credential interceptor is
  * installed: every Tradernet quotes endpoint used here is unauthenticated.
  */
 object TradernetClientFactory {
@@ -24,11 +24,20 @@ object TradernetClientFactory {
             .build()
     }
 
-    /** Retrofit instance wired now for the later REST capability; no service is bound yet. */
+    /** Retrofit instance bound to the top-securities REST service. */
     val retrofit: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
             .build()
+    }
+
+    /**
+     * Retrofit service for `GET https://tradernet.com/api/` with a serialized `q`
+     * query parameter. Uses Retrofit's built-in `ResponseBody` converter, so no
+     * JSON converter dependency is needed.
+     */
+    val topSecuritiesService: TopSecuritiesService by lazy {
+        retrofit.create(TopSecuritiesService::class.java)
     }
 }

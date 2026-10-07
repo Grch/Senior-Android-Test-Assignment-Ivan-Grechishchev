@@ -1,0 +1,36 @@
+# Android build outputs
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Build and generated directories (any depth)
+**/build/
+build/
+.gradle/
+captures/
+.navigation/
+
+# Native build outputs
+.externalNativeBuild
+.cxx
+
+# Local configuration
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Signing material
+*.jks
+*.keystore
+
+# Misc
+.DS_Store
+*.log
+
+# Personal opencode skills/agents
+/.opencode/

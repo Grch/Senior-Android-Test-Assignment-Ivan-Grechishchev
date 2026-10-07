@@ -2,7 +2,7 @@ package com.grch.tradernettestasignment.feature.quotes.impl
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.FixedTickers
+import com.grch.tradernettestasignment.feature.quotes.api.domain.FixedTickers
 
 /**
  * Immutable screen state owned by [QuotesViewModel].

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,7 +32,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import java.math.BigDecimal
 
 private val PositiveGreen = Color(0xFF1E9E5A)
@@ -43,12 +44,12 @@ private const val PLACEHOLDER = "—"
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports app
  * foreground and screen visibility as actions, observes state, and forwards
- * actions. It never creates or holds the socket.
+ * actions. Hilt supplies the ViewModel and its API/data dependencies.
  */
 @Composable
 fun QuotesRoot(
     modifier: Modifier = Modifier,
-    viewModel: QuotesViewModel = viewModel(),
+    viewModel: QuotesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -72,11 +73,13 @@ fun QuotesRoot(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    QuotesScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+        QuotesScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = Modifier.padding(innerPadding),
+        )
+    }
 }
 
 /**

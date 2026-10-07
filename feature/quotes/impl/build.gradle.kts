@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -24,7 +26,6 @@ android {
 }
 
 dependencies {
-    // Implementation depends on the public boundary, never the reverse.
     implementation(project(":feature:quotes:api"))
 
     implementation(platform(libs.androidx.compose.bom))
@@ -34,13 +35,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
-    // Networking boundary: Retrofit for later REST capability and OkHttp for the
-    // live quotes WebSocket. Both stay inside the feature implementation.
+    implementation(libs.dagger.hilt.android)
+    ksp(libs.dagger.hilt.compiler)
+
     implementation(libs.retrofit)
     implementation(libs.okhttp)
-
-    lintChecks(libs.slack.compose.lint.checks)
+    implementation(libs.moshi)
+    implementation(libs.moshi.kotlin)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -1,7 +1,10 @@
 package com.grch.tradernettestasignment.feature.quotes.impl.data
 
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.TopSecurityRef
-import org.json.JSONException
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecurityRef
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonDataException
+import java.io.IOException
+import javax.inject.Inject
 import org.json.JSONObject
 
 /**
@@ -31,10 +34,10 @@ internal fun topSecuritiesRequestQuery(): String = JSONObject().apply {
  *
  * [Success] carries the securities in response order. [DeclaredFailure] marks the
  * documented `code`/`error`/`errMsg` failure payload. Malformed JSON or a missing
- * `tickers` array throws [JSONException] so the data source can classify it as a
- * parse failure.
+ * `tickers` array throws [TopSecuritiesParseException] so the data source can
+ * classify it as a parse failure.
  */
-internal sealed interface ParsedTopSecurities {
+sealed interface ParsedTopSecurities {
     data class Success(val securities: List<TopSecurityRef>) : ParsedTopSecurities
     data object DeclaredFailure : ParsedTopSecurities
 }
@@ -48,34 +51,37 @@ internal sealed interface ParsedTopSecurities {
  * optional name metadata only. Any unrelated objects (for example `buttons` in
  * the live response) are ignored.
  */
-internal fun parseTopSecuritiesResponse(raw: String): ParsedTopSecurities {
-    val root = JSONObject(raw)
-    if (root.has("code") || root.has("error") || root.has("errMsg")) {
-        return ParsedTopSecurities.DeclaredFailure
-    }
-    if (!root.has("tickers")) {
-        throw JSONException("Response has no tickers array")
-    }
-    val tickerArray = root.optJSONArray("tickers")
-        ?: throw JSONException("tickers is not an array")
-    val details = root.optJSONObject("details")
-    val securities = buildList {
-        for (index in 0 until tickerArray.length()) {
-            // Only accept a genuine non-blank JSON string. JSON null is exposed
-            // as JSONObject.NULL (not a String), so it is skipped rather than
-            // becoming the literal ticker "null"; numbers/objects are skipped too.
-            val ticker = (tickerArray.opt(index) as? String)
-                ?.takeIf { it.isNotBlank() }
-                ?: continue
-            val name = (details?.optJSONObject(ticker)?.opt("name") as? String)
-                ?.takeIf { it.isNotBlank() }
-            add(TopSecurityRef(ticker = ticker, name = name))
+class TopSecuritiesResponseParser @Inject constructor(
+    private val adapter: JsonAdapter<TopSecuritiesResponseDto>,
+) {
+    fun parse(raw: String): ParsedTopSecurities {
+        val root = try {
+            adapter.fromJson(raw)
+        } catch (exception: IOException) {
+            throw TopSecuritiesParseException(exception)
+        } catch (exception: JsonDataException) {
+            throw TopSecuritiesParseException(exception)
+        } ?: throw TopSecuritiesParseException()
+        if (root.code != null || root.error != null || root.errorMessage != null) {
+            return ParsedTopSecurities.DeclaredFailure
         }
+        val tickerArray = root.tickers ?: throw TopSecuritiesParseException()
+        val securities = buildList {
+            for (value in tickerArray) {
+                val ticker = (value as? String)?.takeIf { it.isNotBlank() } ?: continue
+                val name = (root.details?.get(ticker)?.name as? String)
+                    ?.takeIf { it.isNotBlank() }
+                add(TopSecurityRef(ticker = ticker, name = name))
+            }
+        }
+        if (tickerArray.isNotEmpty() && securities.isEmpty()) {
+            // A populated array made entirely of invalid entries is a malformed
+            // response, not a valid empty one: fail so the caller falls back.
+            throw TopSecuritiesParseException()
+        }
+        return ParsedTopSecurities.Success(securities)
     }
-    if (tickerArray.length() > 0 && securities.isEmpty()) {
-        // A populated array made entirely of invalid entries is a malformed
-        // response, not a valid empty one: fail so the caller falls back.
-        throw JSONException("tickers contains no valid string entries")
-    }
-    return ParsedTopSecurities.Success(securities)
 }
+
+internal class TopSecuritiesParseException(cause: Throwable? = null) :
+    IllegalArgumentException("Malformed top-securities response", cause)

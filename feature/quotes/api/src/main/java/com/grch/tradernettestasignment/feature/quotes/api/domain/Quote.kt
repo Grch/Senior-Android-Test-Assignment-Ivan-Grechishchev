@@ -1,4 +1,4 @@
-package com.grch.tradernettestasignment.feature.quotes.impl.domain
+package com.grch.tradernettestasignment.feature.quotes.api.domain
 
 /**
  * A single security quote update from the Tradernet `q` carrier.

@@ -1,33 +1,19 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.android.lint)
 }
 
-android {
-    namespace = "com.grch.tradernettestasignment.feature.quotes.api"
-    compileSdk {
-        version = release(37)
-    }
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
 
-    defaultConfig {
-        minSdk = 28
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    buildFeatures {
-        compose = true
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 
-// The public entry contract exposes Compose types (Modifier, @Composable),
-// so Compose is exported as `api` to keep the boundary usable by consumers.
 dependencies {
-    api(platform(libs.androidx.compose.bom))
-    api(libs.androidx.compose.ui)
-    api(libs.androidx.compose.runtime)
-    lintChecks(libs.slack.compose.lint.checks)
+    api(libs.kotlinx.coroutines.core)
 }

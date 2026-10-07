@@ -3,31 +3,28 @@ package com.grch.tradernettestasignment.feature.quotes.impl
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.grch.tradernettestasignment.feature.quotes.impl.data.QuoteSocketDataSource
-import com.grch.tradernettestasignment.feature.quotes.impl.data.TopSecuritiesDataSource
-import com.grch.tradernettestasignment.feature.quotes.impl.data.TradernetQuoteSocketDataSource
-import com.grch.tradernettestasignment.feature.quotes.impl.data.TradernetTopSecuritiesDataSource
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.FixedTickers
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.Quote
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.TopSecuritiesResult
-import kotlinx.coroutines.CancellationException
+import com.grch.tradernettestasignment.feature.quotes.api.domain.FixedTickers
+import com.grch.tradernettestasignment.feature.quotes.api.domain.Quote
+import com.grch.tradernettestasignment.feature.quotes.api.domain.QuoteRepository
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesDataSource
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesResult
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Owns the quotes screen state, the active ticker set, and the live socket
- * lifecycle.
+ * Owns the quotes screen state, active ticker set, and collection lifecycle.
  *
- * The ViewModel is the only owner of the stream: composables render state and
- * dispatch [QuotesAction]s, and never create or hold the socket. The stream runs
- * only while the app is foreground AND the screen is visible; either turning
- * `false` cancels the stream and its retry loop.
+ * The ViewModel owns whether the stream is collected: composables render state
+ * and dispatch [QuotesAction]s, and never create or hold the socket. Collection
+ * runs only while the app is foreground AND the screen is visible; either turning
+ * `false` cancels collection. Socket retries are owned by the data layer.
  *
  * Source policy (agreed): the top-securities API is requested by default every
  * time the quotes screen opens (the rising edge of
@@ -38,9 +35,10 @@ import kotlinx.coroutines.launch
  * persisted preference, or build flag. Changing the active set cancels and
  * reconnects/resubscribes the same verified one-frame format.
  */
-class QuotesViewModel(
-    private val socketDataSource: QuoteSocketDataSource = TradernetQuoteSocketDataSource(),
-    private val topSecuritiesDataSource: TopSecuritiesDataSource = TradernetTopSecuritiesDataSource(),
+@HiltViewModel
+class QuotesViewModel @Inject constructor(
+    private val quoteRepository: QuoteRepository,
+    private val topSecuritiesDataSource: TopSecuritiesDataSource,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(QuotesState())
@@ -141,7 +139,7 @@ class QuotesViewModel(
         if (shouldStream) startStreaming() else stopStreaming()
     }
 
-    /** Cancels any current subscription and starts a fresh one if streaming. */
+    /** Cancels current collection and starts a fresh one if streaming. */
     private fun restartStreaming() {
         streamJob?.cancel()
         streamJob = null
@@ -153,18 +151,11 @@ class QuotesViewModel(
         if (streamJob?.isActive == true) return
         _state.update { it.copy(isStreaming = true) }
         streamJob = viewModelScope.launch {
-            while (isActive && shouldStream) {
-                try {
-                    socketDataSource.observeQuotes(activeTickers).collect { quote -> mergeQuote(quote) }
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: Exception) {
-                    // Transient socket failure: fall through to the reconnect delay.
-                }
-                if (!shouldStream) break
-                delay(RECONNECT_DELAY_MS)
+            try {
+                quoteRepository.observeQuotes(activeTickers).collect(::mergeQuote)
+            } finally {
+                _state.update { it.copy(isStreaming = false) }
             }
-            _state.update { it.copy(isStreaming = false) }
         }
     }
 
@@ -228,7 +219,6 @@ class QuotesViewModel(
 
     private companion object {
         const val TAG = "QuotesViewModel"
-        const val RECONNECT_DELAY_MS = 2_000L
         const val FLASH_DURATION_MS = 300L
     }
 }

@@ -1,46 +1,25 @@
 package com.grch.tradernettestasignment.feature.quotes.impl.data
 
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.Quote
+import com.grch.tradernettestasignment.feature.quotes.api.domain.Quote
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonReader
+import com.squareup.moshi.JsonWriter
+import javax.inject.Inject
 import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
-
-/**
- * Wire DTO for the object delivered under the Tradernet `q` event.
- *
- * The documented field layout
- * (`https://tradernet.com/tradernet-api/quotes-get-changes/?site_lang=en`) uses
- * named fields, not array positions:
- * - `c`   ticker
- * - `ltr` exchange of the latest trade
- * - `name` security name
- * - `ltp` last-trade price
- * - `chg` signed point change relative to the previous close
- * - `pcp` percent change relative to the previous close
- * - `pp`  previous close
- *
- * All fields except [ticker] are optional because later frames are partial.
- */
-internal data class QuoteMessageDto(
-    val ticker: String,
-    val exchange: String?,
-    val name: String?,
-    val lastPrice: Double?,
-    val change: Double?,
-    val percentChange: Double?,
-    val previousClose: Double?,
-)
 
 /** Maps the parsed wire DTO onto the domain model. */
-internal fun QuoteMessageDto.toQuote(): Quote = Quote(
-    ticker = ticker,
-    exchange = exchange,
-    name = name,
-    lastPrice = lastPrice,
-    change = change,
-    percentChange = percentChange,
-    previousClose = previousClose,
-)
+internal fun QuotePayloadDto.toQuote(): Quote? {
+    val validTicker = ticker?.takeIf(String::isNotBlank) ?: return null
+    return Quote(
+        ticker = validTicker,
+        exchange = exchange,
+        name = name,
+        lastPrice = lastPrice,
+        change = change,
+        percentChange = percentChange,
+        previousClose = previousClose,
+    )
+}
 
 /**
  * Builds the one-and-only subscription text frame for the `quotes` event.
@@ -68,41 +47,49 @@ internal fun subscriptionFrame(tickers: List<String>): String {
  * array; a live capture confirms the object form, so only the object form is
  * supported here.
  */
-internal fun parseQuoteMessage(raw: String): Quote? {
-    val frame = try {
-        JSONArray(raw)
-    } catch (e: JSONException) {
-        return null
+class QuoteMessageParser @Inject constructor(
+    private val quoteFrameAdapter: JsonAdapter<QuoteFrameDto>,
+) {
+    fun parse(raw: String): Quote? = try {
+        quoteFrameAdapter.fromJson(raw)
+            ?.takeIf { it.event == QUOTES_EVENT }
+            ?.payload
+            ?.toQuote()
+    } catch (_: Exception) {
+        // Unrelated and malformed frames are not quote updates.
+        null
     }
-    if (frame.optString(0) != QUOTES_EVENT) return null
-    val payload = frame.optJSONObject(1) ?: return null
-    val ticker = payload.optString(QUOTE_TICKER).takeIf { it.isNotEmpty() } ?: return null
-
-    val dto = QuoteMessageDto(
-        ticker = ticker,
-        exchange = payload.stringOrNull("ltr"),
-        name = payload.stringOrNull("name"),
-        lastPrice = payload.doubleOrNull("ltp"),
-        change = payload.doubleOrNull("chg"),
-        percentChange = payload.doubleOrNull("pcp"),
-        previousClose = payload.doubleOrNull("pp"),
-    )
-    return dto.toQuote()
 }
 
 private const val QUOTES_EVENT = "q"
-private const val QUOTE_TICKER = "c"
 
-private fun JSONObject.stringOrNull(key: String): String? {
-    if (!has(key) || isNull(key)) return null
-    return optString(key).takeIf { it.isNotEmpty() }
-}
+/** Moshi adapter for the documented/live-verified `event, payload, metadata` tuple. */
+internal class QuoteFrameJsonAdapter(
+    private val payloadAdapter: JsonAdapter<QuotePayloadDto>,
+) : JsonAdapter<QuoteFrameDto>() {
+    override fun fromJson(reader: JsonReader): QuoteFrameDto? {
+        if (reader.peek() == JsonReader.Token.NULL) return reader.nextNull()
+        reader.beginArray()
+        val event = if (reader.hasNext() && reader.peek() == JsonReader.Token.STRING) {
+            reader.nextString()
+        } else {
+            if (reader.hasNext()) reader.skipValue()
+            null
+        }
+        val payload = if (event == QUOTES_EVENT && reader.hasNext() &&
+            reader.peek() == JsonReader.Token.BEGIN_OBJECT
+        ) {
+            payloadAdapter.fromJson(reader)
+        } else {
+            if (reader.hasNext()) reader.skipValue()
+            null
+        }
+        while (reader.hasNext()) reader.skipValue()
+        reader.endArray()
+        return QuoteFrameDto(event = event, payload = payload)
+    }
 
-private fun JSONObject.doubleOrNull(key: String): Double? {
-    if (!has(key) || isNull(key)) return null
-    return when (val value = opt(key)) {
-        is Number -> value.toDouble()
-        is String -> value.toDoubleOrNull()
-        else -> null
+    override fun toJson(writer: JsonWriter, value: QuoteFrameDto?) {
+        throw UnsupportedOperationException("Quote frames are inbound-only")
     }
 }

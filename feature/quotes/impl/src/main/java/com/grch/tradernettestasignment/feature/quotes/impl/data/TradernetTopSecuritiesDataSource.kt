@@ -1,30 +1,15 @@
 package com.grch.tradernettestasignment.feature.quotes.impl.data
 
 import android.util.Log
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.TopSecuritiesError
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.TopSecuritiesResult
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesDataSource
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesError
+import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesResult
 import java.io.IOException
 import java.util.concurrent.CancellationException
-import org.json.JSONException
+import javax.inject.Inject
 
 /**
- * Fetches the ordered top-securities ticker IDs from the verified Tradernet REST
- * endpoint.
- *
- * A single call is one attempt; fallback and retry policy belong to the caller.
- */
-interface TopSecuritiesDataSource {
-    /**
-     * Returns [TopSecuritiesResult.Success] only for a non-empty parsed `tickers`
-     * list; every failure is a [TopSecuritiesResult.Failure] with a distinct
-     * [TopSecuritiesError].
-     */
-    suspend fun fetchTopSecurities(): TopSecuritiesResult
-}
-
-/**
- * Retrofit-backed [TopSecuritiesDataSource] using the process-wide
- * [TradernetClientFactory] instance.
+ * Retrofit-backed [TopSecuritiesDataSource] using Hilt-provided dependencies.
  *
  * Failure classification:
  * - [TopSecuritiesError.TRANSPORT] — an [IOException] (DNS, connection, timeout).
@@ -35,8 +20,9 @@ interface TopSecuritiesDataSource {
  *
  * Expected failures are returned, never thrown; cancellation is rethrown.
  */
-class TradernetTopSecuritiesDataSource(
-    private val service: TopSecuritiesService = TradernetClientFactory.topSecuritiesService,
+class TradernetTopSecuritiesDataSource @Inject constructor(
+    private val service: TopSecuritiesService,
+    private val parser: TopSecuritiesResponseParser,
 ) : TopSecuritiesDataSource {
 
     override suspend fun fetchTopSecurities(): TopSecuritiesResult {
@@ -52,7 +38,7 @@ class TradernetTopSecuritiesDataSource(
                 Log.d(TAG, "parse failure: empty body")
                 return TopSecuritiesResult.Failure(TopSecuritiesError.PARSE)
             }
-            when (val parsed = parseTopSecuritiesResponse(raw)) {
+            when (val parsed = parser.parse(raw)) {
                 is ParsedTopSecurities.DeclaredFailure -> {
                     Log.d(TAG, "api-declared failure")
                     TopSecuritiesResult.Failure(TopSecuritiesError.API)
@@ -72,7 +58,7 @@ class TradernetTopSecuritiesDataSource(
         } catch (io: IOException) {
             Log.d(TAG, "transport failure: ${io.message}")
             TopSecuritiesResult.Failure(TopSecuritiesError.TRANSPORT)
-        } catch (json: JSONException) {
+        } catch (json: TopSecuritiesParseException) {
             Log.d(TAG, "parse failure: ${json.message}")
             TopSecuritiesResult.Failure(TopSecuritiesError.PARSE)
         } catch (exception: Exception) {

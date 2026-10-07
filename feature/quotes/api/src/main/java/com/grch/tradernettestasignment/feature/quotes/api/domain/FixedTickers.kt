@@ -1,4 +1,4 @@
-package com.grch.tradernettestasignment.feature.quotes.impl.domain
+package com.grch.tradernettestasignment.feature.quotes.api.domain
 
 /**
  * The fixed, ordered watchlist rendered by the quotes board.

@@ -1,7 +1,6 @@
 package com.grch.tradernettestasignment.feature.quotes.impl.data
 
 import android.util.Log
-import com.grch.tradernettestasignment.feature.quotes.impl.domain.FixedTickers
 import com.grch.tradernettestasignment.feature.quotes.impl.domain.Quote
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -21,10 +20,12 @@ import okhttp3.WebSocketListener
  */
 interface QuoteSocketDataSource {
     /**
-     * Emits one [Quote] per incoming `q` payload. Each emission may be partial;
-     * the consumer merges by ticker.
+     * Subscribes to the supplied active ticker set and emits one [Quote] per
+     * incoming `q` payload. The [tickers] value is placed into the same verified
+     * subscription frame; the wire format is unchanged by this capability. Each
+     * emission may be partial; the consumer merges by ticker.
      */
-    fun observeQuotes(): Flow<Quote>
+    fun observeQuotes(tickers: List<String>): Flow<Quote>
 }
 
 /**
@@ -34,14 +35,14 @@ interface QuoteSocketDataSource {
  * `https://tradernet.com/tradernet-api/quotes-get-changes/?site_lang=en` and
  * verified against a live capture: the subscription is one text frame holding
  * `["quotes", ["<ticker>", ...]]`, and updates arrive as
- * `["q", { ...named fields... }, "wstm=..."]`.
+ * `["q", { ...named fields... }, "wstm=..."]`. The active ticker set is supplied
+ * per collection; only its contents change, not the framing.
  */
 class TradernetQuoteSocketDataSource(
     private val client: OkHttpClient = TradernetClientFactory.okHttpClient,
-    private val tickers: List<String> = FixedTickers.ALL,
 ) : QuoteSocketDataSource {
 
-    override fun observeQuotes(): Flow<Quote> = callbackFlow {
+    override fun observeQuotes(tickers: List<String>): Flow<Quote> = callbackFlow {
         val request = Request.Builder()
             .url(TradernetClientFactory.SOCKET_URL)
             .build()

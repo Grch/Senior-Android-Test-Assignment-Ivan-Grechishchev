@@ -237,17 +237,17 @@ class QuotesViewModelTest {
     }
 
     @Test
-    fun `disconnected before any update shows the error state`() = runTest {
+    fun `disconnected before any update stays in content`() = runTest {
         val vm = viewModel()
         vm.onAction(QuotesAction.OnScreenStarted(true))
 
         emitEvent(QuoteStreamEvent.Disconnected)
 
-        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
     }
 
     @Test
-    fun `disconnected after an update keeps the board in content`() = runTest {
+    fun `disconnected after an update stays in content`() = runTest {
         val vm = viewModel()
         vm.onAction(QuotesAction.OnScreenStarted(true))
         emitQuote(tickerA, price = 1.0)
@@ -258,10 +258,78 @@ class QuotesViewModelTest {
     }
 
     @Test
+    fun `connection lost before any update shows the error state`() = runTest {
+        val vm = viewModel()
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+    }
+
+    @Test
+    fun `connection lost after an update shows the error state`() = runTest {
+        val vm = viewModel()
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+        emitQuote(tickerA, price = 1.0)
+
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+    }
+
+    @Test
+    fun `update after error recovers to content without retry`() = runTest {
+        val vm = viewModel()
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+
+        emitQuote(tickerA, price = 42.5, percent = 1.5)
+
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
+        assertEquals(42.5, vm.row(tickerA).lastPrice)
+        assertEquals(1.5, vm.row(tickerA).percentChange)
+        assertEquals(1, repository.requestedTickers.size)
+    }
+
+    @Test
+    fun `connected after error recovers to content without retry`() = runTest {
+        val vm = viewModel()
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+
+        emitEvent(QuoteStreamEvent.Connected)
+
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
+        assertEquals(1, repository.requestedTickers.size)
+    }
+
+    @Test
+    fun `resubscribing after error stays in error until connected`() = runTest {
+        val vm = viewModel()
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+
+        vm.onAction(QuotesAction.OnScreenStarted(false))
+        vm.onAction(QuotesAction.OnScreenStarted(true))
+
+        assertEquals(2, repository.requestedTickers.size)
+        assertEquals(1, repository.activeCollections)
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+
+        emitEvent(QuoteStreamEvent.Connected)
+
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
+    }
+
+    @Test
     fun `retry from error returns to content with a fresh collection`() = runTest {
         val vm = viewModel()
         vm.onAction(QuotesAction.OnScreenStarted(true))
-        emitEvent(QuoteStreamEvent.Disconnected)
+        emitEvent(QuoteStreamEvent.ConnectionLost)
         assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
 
         vm.onAction(QuotesAction.OnRetryClicked)
@@ -349,7 +417,7 @@ class QuotesViewModelTest {
         emitQuote("UNKNOWN.XX", price = 99.0)
 
         assertEquals(before, vm.state.value)
-        emitEvent(QuoteStreamEvent.Disconnected)
+        emitEvent(QuoteStreamEvent.ConnectionLost)
         assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
     }
 
@@ -357,7 +425,7 @@ class QuotesViewModelTest {
     fun `an unknown ticker update does not leave the error state`() = runTest {
         val vm = viewModel()
         vm.onAction(QuotesAction.OnScreenStarted(true))
-        emitEvent(QuoteStreamEvent.Disconnected)
+        emitEvent(QuoteStreamEvent.ConnectionLost)
         assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
 
         emitQuote("UNKNOWN.XX", price = 99.0)

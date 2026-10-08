@@ -27,7 +27,8 @@ data class QuotesState(
      * What the screen should render. [rows] (tickers and symbols are known
      * upfront, so [BoardStatus.CONTENT] renders immediately — each row shimmers
      * only the specific fields it doesn't have yet) or the full-screen error
-     * placeholder in [BoardStatus.ERROR].
+     * placeholder in [BoardStatus.ERROR], shown once the connection is lost
+     * (repeated reconnect attempts failed).
      */
     val boardStatus: BoardStatus = BoardStatus.CONTENT,
 )

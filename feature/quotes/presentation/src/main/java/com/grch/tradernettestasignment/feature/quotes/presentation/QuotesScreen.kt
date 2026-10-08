@@ -46,6 +46,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,14 +64,16 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.grch.tradernettestasignment.feature.quotes.domain.model.FixedTickers
 import kotlinx.coroutines.delay
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_DURATION_MS = 300L
 private val LogoSize = 20.dp
+
+/** Test-only semantics flag: true while the percent badge shows its tick highlight. */
+internal val PercentHighlighted = SemanticsPropertyKey<Boolean>("PercentHighlighted")
+private var SemanticsPropertyReceiver.percentHighlighted by PercentHighlighted
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports the
@@ -137,7 +142,7 @@ fun QuotesScreen(
     }
 }
 
-/** Full-screen placeholder shown when the socket has never delivered any data. */
+/** Full-screen placeholder shown when the connection is lost after repeated failed reconnect attempts. */
 @Composable
 private fun QuotesErrorBoard(
     onRetryClick: () -> Unit,
@@ -253,6 +258,8 @@ private fun QuoteRowItem(
     }
 }
 
+/** Lining-digit height as a fraction of the font size (Roboto cap/digit height is about 0.71-0.72 em). */
+private const val DIGIT_HEIGHT_EM = 0.72f
 private const val SHIMMER_ANIMATION_MS = 1100
 private const val SHIMMER_SWEEP_WIDTH = 600f
 
@@ -378,20 +385,31 @@ private fun PercentBadge(
         FlashDirection.NONE -> Color.Transparent
     }
     val textColor = if (highlighted) Color.White else signColor(sign)
+    val textStyle = MaterialTheme.typography.titleMedium
+    // Read only while drawing (after layout), so a plain holder avoids recomposition.
+    val baseline = remember { FloatArray(1) }
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = textStyle,
+        onTextLayout = { layout -> baseline[0] = layout.firstBaseline },
         fontWeight = FontWeight.Normal,
         color = textColor,
         // The flash pill is drawn outset around the text instead of padding it, so the
         // text's right edge stays aligned with the price line below.
-        modifier = modifier.drawBehind {
+        modifier = modifier.semantics {
+            // Exposes the highlight state to UI tests; has no visual effect.
+            percentHighlighted = highlighted
+        }.drawBehind {
             if (background.alpha == 0f) return@drawBehind
             val p = 2.dp.toPx()
+            // The pill hugs the glyphs (digits, + - . % never descend below the baseline)
+            // rather than the layout box, which includes extra line-height padding.
+            val top = baseline[0] - textStyle.fontSize.toPx() * DIGIT_HEIGHT_EM - p
+            val bottom = baseline[0] + p
             drawRoundRect(
                 color = background,
-                topLeft = Offset(-p, -p),
-                size = Size(size.width + 2 * p, size.height + 2 * p),
+                topLeft = Offset(-p, top),
+                size = Size(size.width + 2 * p, bottom - top),
                 cornerRadius = CornerRadius(4.dp.toPx()),
             )
         },
@@ -416,43 +434,6 @@ private fun signColor(value: Double?): Color = when {
     value > 0 -> PositiveGreen
     value < 0 -> NegativeRed
     else -> primaryTextColor()
-}
-
-private fun formatPercent(value: Double): String = formatSigned(value) + "%"
-
-private fun formatSigned(value: Double): String {
-    val sign = if (value > 0) "+" else ""
-    return sign + formatValue(value)
-}
-
-private fun formatValue(value: Double): String =
-    BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
-
-/**
- * Formats a price-scale value (last price or its points delta) per the
- * `min-step-price-formatting` spec: when [minStep] is known, round to its
- * nearest multiple and pad to exactly its own decimal-place count; otherwise
- * fall back to the board's default trailing-zero-stripped display.
- */
-private fun formatPrice(value: Double, minStep: Double?): String =
-    if (minStep != null && minStep > 0.0) roundToMinStep(value, minStep).toPlainString() else formatValue(value)
-
-private fun formatSignedPrice(value: Double, minStep: Double?): String {
-    val sign = if (value > 0) "+" else ""
-    return sign + formatPrice(value, minStep)
-}
-
-/**
- * Rounds [value] to the nearest multiple of [minStep] and scales the result
- * to [minStep]'s own decimal-place count (its scale after stripping trailing
- * zeros), so e.g. a 0.0001 step always yields 4 decimal places, even if some
- * are zero.
- */
-private fun roundToMinStep(value: Double, minStep: Double): BigDecimal {
-    val step = BigDecimal.valueOf(minStep)
-    val decimalPlaces = step.stripTrailingZeros().scale().coerceAtLeast(0)
-    val steps = BigDecimal.valueOf(value).divide(step, 0, RoundingMode.HALF_UP)
-    return steps.multiply(step).setScale(decimalPlaces, RoundingMode.HALF_UP)
 }
 
 @Preview(showBackground = true)

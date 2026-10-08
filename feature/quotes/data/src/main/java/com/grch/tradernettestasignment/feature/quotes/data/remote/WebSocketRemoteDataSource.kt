@@ -18,34 +18,59 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import javax.inject.Inject
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** A connection lifecycle signal or a raw text frame from the Tradernet socket. */
 internal sealed interface SocketEvent {
     data class Frame(val text: String) : SocketEvent
     data object Opened : SocketEvent
     data object Closed : SocketEvent
+
+    /** Terminal: [WebSocketRemoteDataSource.maxAttempts] consecutive attempts failed; no more retries follow. */
+    data object GaveUp : SocketEvent
 }
 
 /** Owns the raw, unauthenticated Tradernet WebSocket connection and its retries. */
-class WebSocketRemoteDataSource @Inject constructor(
+class WebSocketRemoteDataSource internal constructor(
     private val client: OkHttpClient,
+    private val maxAttempts: Int,
+    private val reconnectDelay: Duration,
 ) {
+    @Inject
+    constructor(client: OkHttpClient) : this(client, DEFAULT_MAX_ATTEMPTS, DEFAULT_RECONNECT_DELAY)
+
     /**
      * Emits connection lifecycle events and unmodified text frames, reconnecting
      * after a disconnect while collected. [SocketEvent.Closed] is emitted after
-     * every ended attempt, whether or not it ever reached [SocketEvent.Opened] —
-     * callers use it to detect a failed/no-network first attempt.
+     * every ended attempt, whether or not it ever reached [SocketEvent.Opened].
+     *
+     * A failed attempt is one that never reaches onOpen; a successful open resets
+     * the consecutive-failure count, and a drop of an open connection is not itself
+     * an attempt (it only schedules the next one after [reconnectDelay]). After
+     * [maxAttempts] consecutive failed attempts, [SocketEvent.GaveUp] is emitted
+     * and the flow completes.
      */
     internal fun observeFrames(tickers: List<String>): Flow<SocketEvent> = flow {
+        var failedAttempts = 0
         while (currentCoroutineContext().isActive) {
+            var opened = false
             openConnection(tickers)
                 .catch { failure ->
                     if (failure is CancellationException) throw failure
                     Log.d(TAG, "socket ended: ${failure.message}")
                 }
-                .collect { event -> emit(event) }
+                .collect { event ->
+                    if (event == SocketEvent.Opened) opened = true
+                    emit(event)
+                }
             emit(SocketEvent.Closed)
-            if (currentCoroutineContext().isActive) delay(RECONNECT_DELAY_MS)
+            failedAttempts = if (opened) 0 else failedAttempts + 1
+            if (failedAttempts >= maxAttempts) {
+                emit(SocketEvent.GaveUp)
+                return@flow
+            }
+            if (currentCoroutineContext().isActive) delay(reconnectDelay)
         }
     }
 
@@ -90,6 +115,7 @@ class WebSocketRemoteDataSource @Inject constructor(
     private companion object {
         const val TAG = "TradernetQuotes"
         const val NORMAL_CLOSURE = 1000
-        const val RECONNECT_DELAY_MS = 2_000L
+        const val DEFAULT_MAX_ATTEMPTS = 3
+        val DEFAULT_RECONNECT_DELAY = 2.seconds
     }
 }

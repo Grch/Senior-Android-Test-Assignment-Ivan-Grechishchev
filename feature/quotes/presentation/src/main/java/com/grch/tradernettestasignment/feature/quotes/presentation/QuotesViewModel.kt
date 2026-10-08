@@ -45,10 +45,12 @@ import kotlinx.coroutines.launch
  *
  * [QuotesState.boardStatus] starts at [BoardStatus.CONTENT] — rows render
  * immediately, each shimmering only the fields it doesn't have yet — and only
- * moves to [BoardStatus.ERROR] if the socket disconnects before any quote has
- * ever arrived for any row: a genuine first-connection failure, not a
- * transient reconnect once the board already has something to show. The first
- * quote merged from any source moves it back to [BoardStatus.CONTENT].
+ * moves to [BoardStatus.ERROR] on [QuoteStreamEvent.ConnectionLost], i.e. once the
+ * data layer has given up after repeated failed reconnect attempts, whether or not
+ * data ever arrived. A plain [QuoteStreamEvent.Disconnected] keeps showing the last
+ * data (or shimmer) while the data layer reconnects. Any quote merged from a source
+ * moves the status back to [BoardStatus.CONTENT], as does a successful
+ * [QuoteStreamEvent.Connected] or a manual retry.
  */
 @HiltViewModel
 class QuotesViewModel @Inject constructor(
@@ -66,7 +68,6 @@ class QuotesViewModel @Inject constructor(
     private val activeTickers = MutableStateFlow(FixedTickers.ALL)
     private val retries = MutableStateFlow(0)
     private var sourceJob: Job? = null
-    private var hasReceivedData = false
 
     init {
         requestTopSecurities()
@@ -189,21 +190,22 @@ class QuotesViewModel @Inject constructor(
 
     /**
      * Routes a stream event: a [QuoteStreamEvent.Update] merges into its row.
-     * [QuoteStreamEvent.Disconnected] only matters while no data has ever
-     * arrived — it means the board has nothing to show and the connection
-     * just failed (no network, rejected socket, ...), so the UI switches to
-     * the error placeholder. Once real data has arrived, later disconnects
-     * are handled silently by the data layer's own automatic reconnect.
+     * [QuoteStreamEvent.Disconnected] is ignored — the data layer is reconnecting
+     * and the board keeps showing its last data or shimmer.
+     * [QuoteStreamEvent.Connected] clears a prior error placeholder, so a successful
+     * (re)connect never leaves the error shown over a live socket.
+     * [QuoteStreamEvent.ConnectionLost] is terminal (the data layer gave up and
+     * the stream completes), so the UI switches to the error placeholder
+     * regardless of whether data ever arrived; the user can retry manually.
      */
     private fun handleStreamEvent(event: QuoteStreamEvent) {
         when (event) {
             is QuoteStreamEvent.Update -> mergeQuote(event.quote)
-            QuoteStreamEvent.Connected -> Unit
-            QuoteStreamEvent.Disconnected -> {
-                if (!hasReceivedData) {
-                    _state.update { it.copy(boardStatus = BoardStatus.ERROR) }
-                }
-            }
+            QuoteStreamEvent.Connected ->
+                _state.update { it.copy(boardStatus = BoardStatus.CONTENT) }
+            QuoteStreamEvent.Disconnected -> Unit
+            QuoteStreamEvent.ConnectionLost ->
+                _state.update { it.copy(boardStatus = BoardStatus.ERROR) }
         }
     }
 
@@ -213,7 +215,6 @@ class QuotesViewModel @Inject constructor(
             // Spec: never add a ticker outside the current active set. An update
             // that merges into no row is a full no-op.
             if (rowIndex == -1) return@update state
-            hasReceivedData = true
             val row = state.rows[rowIndex]
             val direction = directionalChange(row.lastPrice, quote.lastPrice)
             val changed = direction != FlashDirection.NONE

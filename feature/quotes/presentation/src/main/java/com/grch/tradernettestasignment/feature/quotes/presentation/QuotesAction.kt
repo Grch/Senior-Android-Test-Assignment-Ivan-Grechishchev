@@ -14,8 +14,8 @@ package com.grch.tradernettestasignment.feature.quotes.presentation
  * persisted preference.
  *
  * [OnRetryClicked] is dispatched only from the error placeholder's "Try again"
- * button, shown when the board has never received any data and the socket is
- * disconnected.
+ * button, shown after the data layer gave up reconnecting
+ * (connection lost).
  */
 sealed interface QuotesAction {
     data class OnScreenStarted(val isStarted: Boolean) : QuotesAction

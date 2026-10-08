@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.grch.tradernettestasignment.feature.quotes.api.domain.FixedTickers
 import com.grch.tradernettestasignment.feature.quotes.api.domain.Quote
 import com.grch.tradernettestasignment.feature.quotes.api.domain.QuoteRepository
+import com.grch.tradernettestasignment.feature.quotes.api.domain.QuoteStreamEvent
 import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesDataSource
 import com.grch.tradernettestasignment.feature.quotes.api.domain.TopSecuritiesResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +37,13 @@ import kotlinx.coroutines.launch
  * set. There is no toggle, persisted preference, or build flag. Changing the
  * active set cancels and reconnects/resubscribes the same verified one-frame
  * format.
+ *
+ * [QuotesState.boardStatus] starts at [BoardStatus.CONTENT] — rows render
+ * immediately, each shimmering only the fields it doesn't have yet — and only
+ * moves to [BoardStatus.ERROR] if the socket disconnects before any quote has
+ * ever arrived for any row: a genuine first-connection failure, not a
+ * transient reconnect once the board already has something to show. The first
+ * quote merged from any source moves it back to [BoardStatus.CONTENT].
  */
 @HiltViewModel
 class QuotesViewModel @Inject constructor(
@@ -51,6 +59,7 @@ class QuotesViewModel @Inject constructor(
     private var streamJob: Job? = null
     private var sourceJob: Job? = null
     private var activeTickers: List<String> = FixedTickers.ALL
+    private var hasReceivedData = false
     private val flashJobs = mutableMapOf<String, Job>()
 
     fun onAction(action: QuotesAction) {
@@ -68,6 +77,15 @@ class QuotesViewModel @Inject constructor(
                 // rendering until the response is applied.
                 if (action.isVisible && !wasVisible) requestTopSecurities()
                 updateStreaming()
+            }
+
+            QuotesAction.OnRetryClicked -> {
+                // A manual nudge: leave the error placeholder and reconnect right
+                // away, bypassing the data layer's own retry delay. Rows already
+                // carry whatever they had before, and keep shimmering any field
+                // that's still unknown.
+                _state.update { it.copy(boardStatus = BoardStatus.CONTENT) }
+                restartStreaming()
             }
         }
     }
@@ -176,7 +194,7 @@ class QuotesViewModel @Inject constructor(
         _state.update { it.copy(isStreaming = true) }
         streamJob = viewModelScope.launch {
             try {
-                quoteRepository.observeQuotes(activeTickers).collect(::mergeQuote)
+                quoteRepository.observeQuotes(activeTickers).collect(::handleStreamEvent)
             } finally {
                 _state.update { it.copy(isStreaming = false) }
             }
@@ -189,13 +207,34 @@ class QuotesViewModel @Inject constructor(
         _state.update { it.copy(isStreaming = false) }
     }
 
+    /**
+     * Routes a stream event: a [QuoteStreamEvent.Update] merges into its row.
+     * [QuoteStreamEvent.Disconnected] only matters while no data has ever
+     * arrived — it means the board has nothing to show and the connection
+     * just failed (no network, rejected socket, ...), so the UI switches to
+     * the error placeholder. Once real data has arrived, later disconnects
+     * are handled silently by the data layer's own automatic reconnect.
+     */
+    private fun handleStreamEvent(event: QuoteStreamEvent) {
+        when (event) {
+            is QuoteStreamEvent.Update -> mergeQuote(event.quote)
+            QuoteStreamEvent.Connected -> Unit
+            QuoteStreamEvent.Disconnected -> {
+                if (!hasReceivedData) {
+                    _state.update { it.copy(boardStatus = BoardStatus.ERROR) }
+                }
+            }
+        }
+    }
+
     private fun mergeQuote(quote: Quote) {
+        hasReceivedData = true
         var direction = FlashDirection.NONE
         _state.update { state ->
             direction = FlashDirection.NONE
             val rowIndex = state.rows.indexOfFirst { it.ticker == quote.ticker }
             // Spec: never add a ticker outside the current active set.
-            if (rowIndex == -1) return@update state
+            if (rowIndex == -1) return@update state.copy(boardStatus = BoardStatus.CONTENT)
             val row = state.rows[rowIndex]
             direction = directionalChange(row.lastPrice, quote.lastPrice)
             val merged = row.copy(
@@ -209,7 +248,7 @@ class QuotesViewModel @Inject constructor(
                 flash = if (direction != FlashDirection.NONE) direction else row.flash,
             )
             val rows = state.rows.toMutableList().apply { this[rowIndex] = merged }
-            state.copy(rows = rows)
+            state.copy(rows = rows, boardStatus = BoardStatus.CONTENT)
         }
 
         if (direction != FlashDirection.NONE) scheduleFlashClear(quote.ticker)

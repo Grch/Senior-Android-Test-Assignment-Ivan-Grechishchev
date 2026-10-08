@@ -1,20 +1,28 @@
 package com.grch.tradernettestasignment.feature.quotes.impl
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,9 +37,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -53,7 +68,7 @@ private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_ANIMATION_MS = 150
-private val LogoSize = 36.dp
+private val LogoSize = 20.dp
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports app
@@ -106,18 +121,68 @@ fun QuotesScreen(
     onAction: (QuotesAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(items = state.rows, key = { row -> row.ticker }) { row ->
-            QuoteRowItem(row = row)
+    when (state.boardStatus) {
+        BoardStatus.ERROR -> QuotesErrorBoard(
+            onRetryClick = { onAction(QuotesAction.OnRetryClicked) },
+            modifier = modifier,
+        )
+        BoardStatus.CONTENT -> {
+            // Tickers are known upfront (the fixed list, plus whatever the
+            // top-securities augmentation already settled on), so the real rows
+            // render immediately; a row only shimmers the specific fields it
+            // hasn't received a quote for yet, rather than hiding the whole list
+            // behind a generic loading screen. The shimmer brush is shared and
+            // created only while at least one row still needs it.
+            val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
+            LazyColumn(modifier = modifier.fillMaxSize()) {
+                items(items = state.rows, key = { row -> row.ticker }) { row ->
+                    QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
+                }
+            }
         }
     }
 }
 
+/** Full-screen placeholder shown when the socket has never delivered any data. */
+@Composable
+private fun QuotesErrorBoard(
+    onRetryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Oops, seems we've got an error",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(onClick = onRetryClick) {
+            Text("Try again")
+        }
+    }
+}
+
+/**
+ * A single watchlist row. While [row] has no [QuoteRow.lastPrice] yet (no quote
+ * frame has arrived for it), the name/exchange line and the whole price area
+ * shimmer using [shimmerBrush] instead of showing a dash — the ticker itself is
+ * always known upfront, so only it and the logo render immediately either way.
+ */
 @Composable
 private fun QuoteRowItem(
     row: QuoteRow,
+    shimmerBrush: Brush?,
     modifier: Modifier = Modifier,
 ) {
+    val isPending = row.lastPrice == null
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -125,46 +190,63 @@ private fun QuoteRowItem(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SecurityLogo(ticker = row.ticker, modifier = Modifier.padding(end = 12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = row.ticker,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                val secondary = listOfNotNull(row.exchange, row.name).joinToString(" · ")
-                if (secondary.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SecurityLogo(ticker = row.ticker)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = row.ticker,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = primaryTextColor(),
+                    )
+                }
+                val secondary = listOfNotNull(row.exchange, row.name).joinToString(" | ")
+                if (isPending) {
+                    ShimmerBlock(
+                        brush = shimmerBrush,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .fillMaxWidth(0.55f)
+                            .height(12.dp),
+                    )
+                } else if (secondary.isNotEmpty()) {
                     Text(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondaryTextColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
-                PercentBadge(
-                    text = row.percentChange?.let(::formatPercent) ?: PLACEHOLDER,
-                    sign = row.percentChange,
-                    flash = row.flash,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
+            if (isPending) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ShimmerBlock(brush = shimmerBrush, modifier = Modifier.width(52.dp).height(20.dp))
+                    ShimmerBlock(brush = shimmerBrush, modifier = Modifier.width(72.dp).height(14.dp))
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    PercentBadge(
+                        text = row.percentChange?.let(::formatPercent) ?: PLACEHOLDER,
+                        sign = row.percentChange,
+                        flash = row.flash,
                     )
-                    row.change?.let { change ->
-                        Spacer(modifier = Modifier.width(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "(${formatSignedPrice(change, row.minStep)})",
+                            text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
                             style = MaterialTheme.typography.bodySmall,
-                            color = signColor(change),
+                            color = primaryTextColor(),
                         )
+                        row.change?.let { change ->
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "(${formatSignedPrice(change, row.minStep)})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = primaryTextColor(),
+                            )
+                        }
                     }
                 }
             }
@@ -174,6 +256,49 @@ private fun QuoteRowItem(
             color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
+}
+
+private const val SHIMMER_ANIMATION_MS = 1100
+private const val SHIMMER_SWEEP_WIDTH = 600f
+
+/**
+ * A single shared shimmer `Brush`, animated by one [rememberInfiniteTransition]
+ * so every pending row's blocks sweep in sync — the standard Compose approach
+ * (an infinite-transition-driven gradient, no extra dependency) kept subtle
+ * with a low, narrow-alpha-range gradient rather than a bright highlight.
+ */
+@Composable
+private fun rememberShimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translate by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(SHIMMER_ANIMATION_MS, easing = LinearEasing),
+        ),
+        label = "shimmerTranslate",
+    )
+    val base = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+    val highlight = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    return Brush.horizontalGradient(
+        colors = listOf(base, highlight, base),
+        startX = (translate - 0.5f) * SHIMMER_SWEEP_WIDTH,
+        endX = (translate + 0.5f) * SHIMMER_SWEEP_WIDTH,
+    )
+}
+
+/**
+ * [brush] is only ever null when no row in the list is pending, in which case
+ * no [QuoteRowItem] renders a [ShimmerBlock] in the first place; the solid
+ * fallback only guards against that invariant being violated.
+ */
+@Composable
+private fun ShimmerBlock(brush: Brush?, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(brush ?: SolidColor(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))),
+    )
 }
 
 /**
@@ -191,14 +316,14 @@ private fun SecurityLogo(ticker: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(LogoSize)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (showPlaceholder) {
             Text(
                 text = ticker.take(1).uppercase(),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -254,22 +379,42 @@ private fun PercentBadge(
     )
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Normal,
         color = textColor,
-        modifier = modifier
-            .background(background, RoundedCornerShape(8.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+        // The flash pill is drawn outset around the text instead of padding it, so the
+        // text's right edge stays aligned with the price line below.
+        modifier = modifier.drawBehind {
+            if (background.alpha == 0f) return@drawBehind
+            val p = 2.dp.toPx()
+            drawRoundRect(
+                color = background,
+                topLeft = Offset(-p, -p),
+                size = Size(size.width + 2 * p, size.height + 2 * p),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+            )
+        },
     )
 }
+
+// Dynamic color tints onSurface/onSurfaceVariant, so row text uses fixed neutrals.
+@Composable
+@ReadOnlyComposable
+private fun primaryTextColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
+
+@Composable
+@ReadOnlyComposable
+private fun secondaryTextColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFF9A9AA0) else Color(0xFF6E6E73)
 
 @Composable
 @ReadOnlyComposable
 private fun signColor(value: Double?): Color = when {
-    value == null -> MaterialTheme.colorScheme.onSurfaceVariant
+    value == null -> secondaryTextColor()
     value > 0 -> PositiveGreen
     value < 0 -> NegativeRed
-    else -> MaterialTheme.colorScheme.onSurface
+    else -> primaryTextColor()
 }
 
 private fun formatPercent(value: Double): String = formatSigned(value) + "%"
@@ -347,7 +492,31 @@ private fun QuotesScreenPreview() {
                     ),
                     QuoteRow(ticker = "AI.US"),
                 ),
+                boardStatus = BoardStatus.CONTENT,
             ),
+            onAction = {},
+        )
+    }
+}
+
+/** Cold start: every fixed-list row seeded but still pending (no quote yet). */
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenPendingPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenErrorPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(boardStatus = BoardStatus.ERROR),
             onAction = {},
         )
     }

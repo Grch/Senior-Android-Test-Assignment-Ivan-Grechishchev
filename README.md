@@ -36,7 +36,6 @@ Kotlin, Jetpack Compose + Material 3, Hilt, Coroutines/Flow, OkHttp (WebSocket),
 ## Notable decisions
 
 - **Top securities augment the fixed list instead of replacing it.** The fixed ticker list is a mandatory requirement, so tickers returned by the REST call are appended after it. If the call fails, the board silently falls back to the fixed list.
-- **Cyrillic "А" in `АI.US`.** In the assignment PDF the last ticker starts with a Cyrillic "А" (U+0410); the app subscribes to the Latin `AI.US`.
 - **Connection loss.** The data layer reconnects automatically after a 2 s delay. After 3 consecutive failed attempts the UI shows an error screen with "Try again". Tapping it shows the dimmed board with a spinner until the connection is restored.
 - **`min_step` rounding.** A price is rounded to the nearest multiple of `min_step` and shown with `min_step`'s own number of decimals. Because `min_step` arrives only in the first frame, it is kept per ticker across later partial updates. Without a `min_step`, the raw value is formatted.
 

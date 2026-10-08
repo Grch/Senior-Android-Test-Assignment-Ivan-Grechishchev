@@ -1,5 +1,6 @@
 package com.grch.tradernettestassignment.feature.quotes.data.repository
 
+import com.grch.tradernettestassignment.feature.quotes.data.di.DefaultDispatcher
 import com.grch.tradernettestassignment.feature.quotes.data.parser.ParsedTopSecurities
 import com.grch.tradernettestassignment.feature.quotes.data.parser.TopSecuritiesParseException
 import com.grch.tradernettestassignment.feature.quotes.data.parser.TopSecuritiesResponseParser
@@ -9,6 +10,8 @@ import android.util.Log
 import com.grch.tradernettestassignment.feature.quotes.domain.repository.TopSecuritiesDataSource
 import com.grch.tradernettestassignment.feature.quotes.domain.model.TopSecuritiesError
 import com.grch.tradernettestassignment.feature.quotes.domain.model.TopSecuritiesResult
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.CancellationException
 import javax.inject.Inject
@@ -24,10 +27,14 @@ import javax.inject.Inject
  * - [TopSecuritiesError.EMPTY] — a valid response with no tickers.
  *
  * Expected failures are returned, never thrown; cancellation is rethrown.
+ *
+ * Reading and parsing the body is CPU work, so it runs on [defaultDispatcher]; the HTTP call itself
+ * already runs on OkHttp's threads.
  */
 internal class TradernetTopSecuritiesDataSource @Inject constructor(
     private val service: TopSecuritiesService,
     private val parser: TopSecuritiesResponseParser,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : TopSecuritiesDataSource {
 
     // Deliberate error classification: early returns map each failure to a TopSecuritiesError, and the
@@ -41,12 +48,15 @@ internal class TradernetTopSecuritiesDataSource @Inject constructor(
                 response.errorBody()?.close()
                 return TopSecuritiesResult.Failure(TopSecuritiesError.HTTP)
             }
-            val raw = response.body()?.use { body -> body.string() }
-            if (raw.isNullOrBlank()) {
+            val parsed = withContext(defaultDispatcher) {
+                val raw = response.body()?.use { body -> body.string() }
+                if (raw.isNullOrBlank()) null else parser.parse(raw)
+            }
+            if (parsed == null) {
                 Log.d(TAG, "parse failure: empty body")
                 return TopSecuritiesResult.Failure(TopSecuritiesError.PARSE)
             }
-            when (val parsed = parser.parse(raw)) {
+            when (parsed) {
                 is ParsedTopSecurities.DeclaredFailure -> {
                     Log.d(TAG, "api-declared failure")
                     TopSecuritiesResult.Failure(TopSecuritiesError.API)

@@ -9,6 +9,7 @@ import com.grch.tradernettestassignment.feature.quotes.domain.model.Quote
 import com.grch.tradernettestassignment.feature.quotes.domain.model.QuoteStreamEvent
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -33,6 +34,8 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Drives the real [WebSocketRemoteDataSource] against a MockWebServer. The production socket URL
  * is fixed, so an application interceptor redirects every request to the local server.
+ * The repository uses [Dispatchers.Unconfined] because these tests rely on real time (real socket I/O
+ * and reconnect delays), which a virtual-time test dispatcher would not advance.
  * Reconnect waits use a short [RECONNECT_DELAY] so the tests stay fast (bounded by [TIMEOUT_MS]).
  */
 class WebSocketRemoteDataSourceTest {
@@ -41,6 +44,7 @@ class WebSocketRemoteDataSourceTest {
     private lateinit var repository: TradernetQuoteRepository
 
     @Before
+    @Suppress("InjectDispatcher") // Real-time test: see class KDoc.
     fun setUp() {
         server = MockWebServer()
         server.start()
@@ -54,7 +58,7 @@ class WebSocketRemoteDataSourceTest {
         val moshi = Moshi.Builder().build()
         val frameAdapter: JsonAdapter<QuoteFrameDto> =
             QuoteFrameJsonAdapter(moshi.adapter(QuotePayloadDto::class.java))
-        repository = TradernetQuoteRepository(dataSource, QuoteMessageParser(frameAdapter))
+        repository = TradernetQuoteRepository(dataSource, QuoteMessageParser(frameAdapter), Dispatchers.Unconfined)
     }
 
     @After

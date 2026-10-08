@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -63,7 +68,7 @@ private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_ANIMATION_MS = 150
-private val LogoSize = 36.dp
+private val LogoSize = 20.dp
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports app
@@ -185,16 +190,18 @@ private fun QuoteRowItem(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SecurityLogo(ticker = row.ticker, modifier = Modifier.padding(end = 12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = row.ticker,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                val secondary = listOfNotNull(row.exchange, row.name).joinToString(" · ")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SecurityLogo(ticker = row.ticker)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = row.ticker,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
+                        color = primaryTextColor(),
+                    )
+                }
+                val secondary = listOfNotNull(row.exchange, row.name).joinToString(" | ")
                 if (isPending) {
                     ShimmerBlock(
                         brush = shimmerBrush,
@@ -207,7 +214,7 @@ private fun QuoteRowItem(
                     Text(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondaryTextColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -229,15 +236,15 @@ private fun QuoteRowItem(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = row.lastPrice?.let { formatPrice(it, row.minStep) } ?: PLACEHOLDER,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = primaryTextColor(),
                         )
                         row.change?.let { change ->
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "(${formatSignedPrice(change, row.minStep)})",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = signColor(change),
+                                color = primaryTextColor(),
                             )
                         }
                     }
@@ -309,14 +316,14 @@ private fun SecurityLogo(ticker: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(LogoSize)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (showPlaceholder) {
             Text(
                 text = ticker.take(1).uppercase(),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -372,22 +379,42 @@ private fun PercentBadge(
     )
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Normal,
         color = textColor,
-        modifier = modifier
-            .background(background, RoundedCornerShape(8.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+        // The flash pill is drawn outset around the text instead of padding it, so the
+        // text's right edge stays aligned with the price line below.
+        modifier = modifier.drawBehind {
+            if (background.alpha == 0f) return@drawBehind
+            val p = 2.dp.toPx()
+            drawRoundRect(
+                color = background,
+                topLeft = Offset(-p, -p),
+                size = Size(size.width + 2 * p, size.height + 2 * p),
+                cornerRadius = CornerRadius(4.dp.toPx()),
+            )
+        },
     )
 }
+
+// Dynamic color tints onSurface/onSurfaceVariant, so row text uses fixed neutrals.
+@Composable
+@ReadOnlyComposable
+private fun primaryTextColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFFF2F2F7) else Color(0xFF1C1C1E)
+
+@Composable
+@ReadOnlyComposable
+private fun secondaryTextColor(): Color =
+    if (isSystemInDarkTheme()) Color(0xFF9A9AA0) else Color(0xFF6E6E73)
 
 @Composable
 @ReadOnlyComposable
 private fun signColor(value: Double?): Color = when {
-    value == null -> MaterialTheme.colorScheme.onSurfaceVariant
+    value == null -> secondaryTextColor()
     value > 0 -> PositiveGreen
     value < 0 -> NegativeRed
-    else -> MaterialTheme.colorScheme.onSurface
+    else -> primaryTextColor()
 }
 
 private fun formatPercent(value: Double): String = formatSigned(value) + "%"

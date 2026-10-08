@@ -32,7 +32,7 @@ internal sealed interface SocketEvent {
 }
 
 /** Owns the raw, unauthenticated Tradernet WebSocket connection and its retries. */
-class WebSocketRemoteDataSource internal constructor(
+internal class WebSocketRemoteDataSource internal constructor(
     private val client: OkHttpClient,
     private val maxAttempts: Int,
     private val reconnectDelay: Duration,

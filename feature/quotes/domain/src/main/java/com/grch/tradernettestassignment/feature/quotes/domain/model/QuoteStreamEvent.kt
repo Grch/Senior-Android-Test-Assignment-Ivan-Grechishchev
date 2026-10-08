@@ -12,7 +12,10 @@ sealed interface QuoteStreamEvent {
     /** The socket is currently connected; frames may follow at any time. */
     data object Connected : QuoteStreamEvent
 
-    /** The connection ended or a connection attempt failed; a retry follows automatically unless [ConnectionLost] is emitted next. */
+    /**
+     * The connection ended or a connection attempt failed; a retry follows
+     * automatically unless [ConnectionLost] is emitted next.
+     */
     data object Disconnected : QuoteStreamEvent
 
     /**

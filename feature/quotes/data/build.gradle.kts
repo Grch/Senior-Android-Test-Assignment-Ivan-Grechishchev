@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
 }
 
@@ -28,7 +27,8 @@ android {
 dependencies {
     implementation(project(":feature:quotes:domain"))
 
-    implementation(libs.dagger.hilt.android)
+    // hilt-core carries @Module/@InstallIn; the Hilt Gradle plugin and hilt-android are only needed in :app.
+    implementation(libs.dagger.hilt.core)
     ksp(libs.dagger.hilt.compiler)
 
     implementation(libs.retrofit)

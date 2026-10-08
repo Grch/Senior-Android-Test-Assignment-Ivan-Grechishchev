@@ -50,7 +50,7 @@ internal fun subscriptionFrame(tickers: List<String>): String {
  * array; a live capture confirms the object form, so only the object form is
  * supported here.
  */
-class QuoteMessageParser @Inject constructor(
+internal class QuoteMessageParser @Inject constructor(
     private val quoteFrameAdapter: JsonAdapter<QuoteFrameDto>,
 ) {
     fun parse(raw: String): Quote? = try {

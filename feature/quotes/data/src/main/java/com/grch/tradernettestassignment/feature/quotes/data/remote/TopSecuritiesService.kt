@@ -23,7 +23,7 @@ import retrofit2.http.Query
  * a Moshi DTO adapter in [parseTopSecuritiesResponse]. No authentication is
  * attached.
  */
-interface TopSecuritiesService {
+internal interface TopSecuritiesService {
     @GET("api/")
     suspend fun getTopSecurities(@Query("q") q: String): Response<ResponseBody>
 }

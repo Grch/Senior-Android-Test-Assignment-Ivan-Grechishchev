@@ -24,9 +24,11 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import java.util.concurrent.TimeUnit
 
+private const val PING_INTERVAL_SECONDS = 30L
+
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class QuotesDataModule {
+internal abstract class QuotesDataModule {
     @Binds
     @Singleton
     abstract fun bindQuoteRepository(repository: TradernetQuoteRepository): QuoteRepository
@@ -47,7 +49,7 @@ abstract class QuotesDataModule {
         @Provides
         @Singleton
         fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
-            .pingInterval(30, TimeUnit.SECONDS)
+            .pingInterval(PING_INTERVAL_SECONDS, TimeUnit.SECONDS)
             .build()
 
         @Provides

@@ -25,11 +25,14 @@ import javax.inject.Inject
  *
  * Expected failures are returned, never thrown; cancellation is rethrown.
  */
-class TradernetTopSecuritiesDataSource @Inject constructor(
+internal class TradernetTopSecuritiesDataSource @Inject constructor(
     private val service: TopSecuritiesService,
     private val parser: TopSecuritiesResponseParser,
 ) : TopSecuritiesDataSource {
 
+    // Deliberate error classification: early returns map each failure to a TopSecuritiesError, and the
+    // final catch turns any unexpected parsing exception into a PARSE failure instead of crashing.
+    @Suppress("ReturnCount", "TooGenericExceptionCaught")
     override suspend fun fetchTopSecurities(): TopSecuritiesResult {
         return try {
             val response = service.getTopSecurities(topSecuritiesRequestQuery())

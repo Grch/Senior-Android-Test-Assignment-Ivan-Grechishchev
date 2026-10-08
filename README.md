@@ -46,3 +46,13 @@ Kotlin, Jetpack Compose + Material 3, Hilt, Coroutines/Flow, OkHttp (WebSocket),
 ./gradlew lint testDebugUnitTest       # lint + JVM unit tests (data, presentation)
 ./gradlew connectedDebugAndroidTest    # Compose UI tests (needs a device or emulator)
 ```
+
+### Code quality
+
+```bash
+./gradlew detekt detektMain detektTest   # static analysis incl. Compose rules (reports only, never fails the build); reports in <module>/build/reports/detekt/
+./gradlew buildHealth                    # unused or misdeclared dependencies; build/reports/dependency-analysis/build-health-report.txt
+./gradlew koverHtmlReport koverLog       # JVM unit-test coverage, aggregated (koverLog prints a console summary); build/reports/kover/html/index.html
+```
+
+Unit-test coverage (debug unit tests; generated code, `ui.theme`, `@Composable` and `@Preview` code excluded): data 91.6% lines / 92.0% branches, presentation 89.6% lines / 85.9% branches, 90.9% lines overall. Compose UI is covered by instrumented tests (`connectedDebugAndroidTest`).

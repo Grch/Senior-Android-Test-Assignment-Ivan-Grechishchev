@@ -18,7 +18,7 @@ import androidx.compose.runtime.Stable
  * or persisted preference.
  */
 @Stable
-data class QuotesState(
+internal data class QuotesState(
     val rows: List<QuoteRow> = emptyList(),
     val isStreaming: Boolean = false,
     /** The active source chosen by the API-on-screen-open policy. */
@@ -35,7 +35,7 @@ data class QuotesState(
 )
 
 /** See [QuotesViewModel]'s class doc for the exact state machine. */
-enum class BoardStatus {
+internal enum class BoardStatus {
     CONTENT,
     ERROR,
 
@@ -61,7 +61,7 @@ enum class BoardStatus {
  * updates, so it is merged like any other sparse field).
  */
 @Immutable
-data class QuoteRow(
+internal data class QuoteRow(
     val ticker: String,
     /** Resolved security-logo URL, supplied by the domain's logo URL provider. */
     val logoUrl: String,
@@ -77,7 +77,7 @@ data class QuoteRow(
 )
 
 /** Direction of the last price move, used to color the percent-badge highlight. */
-enum class FlashDirection {
+internal enum class FlashDirection {
     NONE,
     UP,
     DOWN,

@@ -96,6 +96,8 @@ class QuoteMessageParserTest {
     @Test
     fun frameAdapterIsInboundOnly() {
         assertThrows(UnsupportedOperationException::class.java) {
+            // The assertion is that serializing throws; there is no result to check.
+            @Suppress("IgnoredReturnValue")
             frameAdapter.toJson(QuoteFrameDto("q", null))
         }
     }

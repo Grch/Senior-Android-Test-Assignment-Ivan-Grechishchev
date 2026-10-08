@@ -1,16 +1,18 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
-    namespace = "com.grch.tradernettestasignment"
+    namespace = "com.grch.tradernettestassignment"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.grch.tradernettestasignment"
+        applicationId = "com.grch.tradernettestassignment"
         minSdk = 28
         targetSdk = 37
         versionCode = 1
@@ -36,20 +38,16 @@ android {
 }
 
 dependencies {
+    implementation(project(":feature:quotes:presentation"))
+    implementation(project(":feature:quotes:data"))
+
+    implementation(libs.dagger.hilt.android)
+    ksp(libs.dagger.hilt.compiler)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    lintChecks(libs.slack.compose.lint.checks)
-    testImplementation(libs.junit)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

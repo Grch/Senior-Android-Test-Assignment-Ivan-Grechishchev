@@ -38,7 +38,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":feature:quotes:impl"))
+    implementation(project(":feature:quotes:presentation"))
+    implementation(project(":feature:quotes:data"))
 
     implementation(libs.dagger.hilt.android)
     ksp(libs.dagger.hilt.compiler)

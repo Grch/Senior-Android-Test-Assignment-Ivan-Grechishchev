@@ -41,6 +41,5 @@ object FixedTickers {
         "KGF.EU",
         "MGGT.EU",
         "SGGD.EU",
-        "AI.US",
     )
 }

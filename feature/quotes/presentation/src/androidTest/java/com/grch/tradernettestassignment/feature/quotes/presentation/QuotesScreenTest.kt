@@ -60,12 +60,12 @@ class QuotesScreenTest {
     fun pendingRowShowsNoPrice() {
         composeRule.setContent {
             QuotesScreen(
-                state = QuotesState(rows = listOf(QuoteRow(ticker = "AI.US", logoUrl = ""))),
+                state = QuotesState(rows = listOf(QuoteRow(ticker = "SGGD.EU", logoUrl = ""))),
                 onRetryClick = {},
             )
         }
 
-        composeRule.onNodeWithText("AI.US").assertIsDisplayed()
+        composeRule.onNodeWithText("SGGD.EU").assertIsDisplayed()
         composeRule.onAllNodesWithText("—").assertCountEquals(0)
         composeRule.onAllNodesWithText("%", substring = true).assertCountEquals(0)
     }

@@ -214,7 +214,7 @@ private fun QuotesScreenPreview() {
                         percentChange = 0.14,
                         minStep = 0.000002,
                     ),
-                    QuoteRow(ticker = "AI.US", logoUrl = "https://example.com/ai.png"),
+                    QuoteRow(ticker = "SGGD.EU", logoUrl = "https://example.com/ai.png"),
                 ),
                 boardStatus = BoardStatus.CONTENT,
             ),

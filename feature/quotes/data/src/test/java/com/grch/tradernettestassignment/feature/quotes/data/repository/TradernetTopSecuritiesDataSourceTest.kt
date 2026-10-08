@@ -1,3 +1,6 @@
+// Tests run under runBlocking with no virtual time, so parsing uses Dispatchers.Unconfined directly.
+@file:Suppress("InjectDispatcher")
+
 package com.grch.tradernettestassignment.feature.quotes.data.repository
 
 import com.grch.tradernettestassignment.feature.quotes.data.model.TopSecuritiesResponseDto
@@ -10,6 +13,7 @@ import com.grch.tradernettestassignment.feature.quotes.domain.model.TopSecurityR
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
@@ -40,6 +44,7 @@ class TradernetTopSecuritiesDataSourceTest {
         dataSource = TradernetTopSecuritiesDataSource(
             service,
             TopSecuritiesResponseParser(Moshi.Builder().build().adapter(TopSecuritiesResponseDto::class.java)),
+            Dispatchers.Unconfined,
         )
     }
 
@@ -126,6 +131,7 @@ class TradernetTopSecuritiesDataSourceTest {
         val source = TradernetTopSecuritiesDataSource(
             service,
             TopSecuritiesResponseParser(Moshi.Builder().build().adapter(TopSecuritiesResponseDto::class.java)),
+            Dispatchers.Unconfined,
         )
 
         assertThrows(CancellationException::class.java) { runBlocking { source.fetchTopSecurities() } }

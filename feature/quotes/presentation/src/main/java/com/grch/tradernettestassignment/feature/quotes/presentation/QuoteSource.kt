@@ -9,7 +9,7 @@ package com.grch.tradernettestassignment.feature.quotes.presentation
  * [AUGMENTED] means the fixed watchlist plus extra tickers appended from a
  * non-empty top-securities response.
  */
-enum class QuoteSource {
+internal enum class QuoteSource {
     /** Only the fixed watchlist is the active ticker set. */
     FIXED,
 

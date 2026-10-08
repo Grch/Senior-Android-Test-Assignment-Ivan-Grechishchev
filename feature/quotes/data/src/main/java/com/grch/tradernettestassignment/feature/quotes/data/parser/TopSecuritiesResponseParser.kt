@@ -8,6 +8,8 @@ import java.io.IOException
 import javax.inject.Inject
 import org.json.JSONObject
 
+private const val TOP_SECURITIES_LIMIT = 30
+
 /**
  * Serializes the top-securities request object for the `q` query parameter:
  *
@@ -23,7 +25,7 @@ internal fun topSecuritiesRequestQuery(): String = JSONObject().apply {
             put("type", "stocks")
             put("exchange", "russia")
             put("gainers", 0)
-            put("limit", 30)
+            put("limit", TOP_SECURITIES_LIMIT)
         },
     )
 }.toString()
@@ -36,7 +38,7 @@ internal fun topSecuritiesRequestQuery(): String = JSONObject().apply {
  * `tickers` array throws [TopSecuritiesParseException] so the data source can
  * classify it as a parse failure.
  */
-sealed interface ParsedTopSecurities {
+internal sealed interface ParsedTopSecurities {
     data class Success(val securities: List<TopSecurityRef>) : ParsedTopSecurities
     data object DeclaredFailure : ParsedTopSecurities
 }
@@ -50,9 +52,11 @@ sealed interface ParsedTopSecurities {
  * optional name metadata only. Any unrelated objects (for example `buttons` in
  * the live response) are ignored.
  */
-class TopSecuritiesResponseParser @Inject constructor(
+internal class TopSecuritiesResponseParser @Inject constructor(
     private val adapter: JsonAdapter<TopSecuritiesResponseDto>,
 ) {
+    // Each malformed shape throws so the data source can classify it as a parse failure.
+    @Suppress("ThrowsCount")
     fun parse(raw: String): ParsedTopSecurities {
         val root = try {
             adapter.fromJson(raw)

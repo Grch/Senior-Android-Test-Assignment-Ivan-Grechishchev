@@ -58,7 +58,7 @@ class QuotesViewModel @Inject constructor(
     private val _state = MutableStateFlow(
         QuotesState(rows = FixedTickers.ALL.map { newRow(it, name = null) }),
     )
-    val state: StateFlow<QuotesState> = _state.asStateFlow()
+    internal val state: StateFlow<QuotesState> = _state.asStateFlow()
 
     private val isStarted = MutableStateFlow(false)
     private val activeTickers = MutableStateFlow(FixedTickers.ALL)

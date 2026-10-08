@@ -1,0 +1,33 @@
+# Overrides on top of detekt's default config (buildUponDefaultConfig = true).
+# Only Compose-specific corrections live here; everything else uses the defaults.
+
+style:
+  MagicNumber:
+    # Previews and Compose UI code use literal dp/sp/alpha values by design.
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/ui/theme/**'
+  UnusedPrivateFunction:
+    # @Preview functions are private and only invoked by Android Studio tooling.
+    ignoreAnnotated:
+      - 'Preview'
+  AbstractClassCanBeInterface:
+    # Hilt @Module classes with only @Binds methods must stay abstract classes (companion @Provides).
+    ignoreAnnotated:
+      - 'Module'
+
+naming:
+  FunctionNaming:
+    # @Composable functions are PascalCase by convention.
+    ignoreAnnotated:
+      - 'Composable'
+
+complexity:
+  LongParameterList:
+    # Composables legitimately take many parameters (state, callbacks, modifier).
+    ignoreAnnotated:
+      - 'Composable'

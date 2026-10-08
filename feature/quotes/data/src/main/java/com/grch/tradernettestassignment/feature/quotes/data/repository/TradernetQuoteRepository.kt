@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import javax.inject.Inject
 
 /** Decodes raw Tradernet quote frames and maps valid partial updates and connection events to domain values. */
-class TradernetQuoteRepository @Inject constructor(
+internal class TradernetQuoteRepository @Inject constructor(
     private val remoteDataSource: WebSocketRemoteDataSource,
     private val parser: QuoteMessageParser,
 ) : QuoteRepository {

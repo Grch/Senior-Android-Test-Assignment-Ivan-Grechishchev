@@ -12,7 +12,7 @@ import com.squareup.moshi.JsonClass
  * first frame.
  */
 @JsonClass(generateAdapter = true)
-data class QuotePayloadDto(
+internal data class QuotePayloadDto(
     @param:Json(name = "c") val ticker: String? = null,
     @param:Json(name = "ltr") val exchange: String? = null,
     @param:Json(name = "name") val name: String? = null,
@@ -24,13 +24,13 @@ data class QuotePayloadDto(
 )
 
 /** The semantically relevant values extracted from the array-shaped wire frame. */
-data class QuoteFrameDto(
+internal data class QuoteFrameDto(
     val event: String?,
     val payload: QuotePayloadDto?,
 )
 
 @JsonClass(generateAdapter = true)
-data class TopSecuritiesResponseDto(
+internal data class TopSecuritiesResponseDto(
     @param:Json(name = "tickers") val tickers: List<Any?>? = null,
     @param:Json(name = "details") val details: Map<String, TopSecurityDetailsDto>? = null,
     @param:Json(name = "code") val code: Any? = null,
@@ -39,6 +39,6 @@ data class TopSecuritiesResponseDto(
 )
 
 @JsonClass(generateAdapter = true)
-data class TopSecurityDetailsDto(
+internal data class TopSecurityDetailsDto(
     @param:Json(name = "name") val name: Any? = null,
 )

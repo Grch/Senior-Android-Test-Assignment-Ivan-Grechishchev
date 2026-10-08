@@ -20,6 +20,7 @@ class TradernetQuoteRepository @Inject constructor(
                 is SocketEvent.Frame -> parser.parse(event.text)?.let(QuoteStreamEvent::Update)
                 SocketEvent.Opened -> QuoteStreamEvent.Connected
                 SocketEvent.Closed -> QuoteStreamEvent.Disconnected
+                SocketEvent.GaveUp -> QuoteStreamEvent.ConnectionLost
             }
         }
 }

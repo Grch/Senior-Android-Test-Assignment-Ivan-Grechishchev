@@ -12,6 +12,13 @@ sealed interface QuoteStreamEvent {
     /** The socket is currently connected; frames may follow at any time. */
     data object Connected : QuoteStreamEvent
 
-    /** The connection ended or a connection attempt failed; a retry follows automatically. */
+    /** The connection ended or a connection attempt failed; a retry follows automatically unless [ConnectionLost] is emitted next. */
     data object Disconnected : QuoteStreamEvent
+
+    /**
+     * Terminal: repeated consecutive connection attempts failed and automatic
+     * retries stopped. The stream completes after this event; a consumer must
+     * resubscribe (e.g. on a manual "Try again") to connect again.
+     */
+    data object ConnectionLost : QuoteStreamEvent
 }

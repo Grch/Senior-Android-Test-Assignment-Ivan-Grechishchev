@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -46,6 +48,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,14 +70,17 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.grch.tradernettestasignment.feature.quotes.domain.model.FixedTickers
 import kotlinx.coroutines.delay
-import java.math.BigDecimal
-import java.math.RoundingMode
 
 private val PositiveGreen = Color(0xFF1E9E5A)
 private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_DURATION_MS = 300L
 private val LogoSize = 20.dp
+private const val RECONNECTING_BOARD_ALPHA = 0.4f
+
+/** Test-only semantics flag: true while the percent badge shows its tick highlight. */
+internal val PercentHighlighted = SemanticsPropertyKey<Boolean>("PercentHighlighted")
+private var SemanticsPropertyReceiver.percentHighlighted by PercentHighlighted
 
 /**
  * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports the
@@ -120,24 +132,52 @@ fun QuotesScreen(
             onRetryClick = { onAction(QuotesAction.OnRetryClicked) },
             modifier = modifier,
         )
-        BoardStatus.CONTENT -> {
-            // Tickers are known upfront (the fixed list, plus whatever the
-            // top-securities augmentation already settled on), so the real rows
-            // render immediately; a row only shimmers the specific fields it
-            // hasn't received a quote for yet, rather than hiding the whole list
-            // behind a generic loading screen. The shimmer brush is shared and
-            // created only while at least one row still needs it.
-            val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
-            LazyColumn(modifier = modifier.fillMaxSize()) {
-                items(items = state.rows, key = { row -> row.ticker }) { row ->
-                    QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
+        // One branch for both statuses so the board keeps its composition (scroll
+        // position, loaded logos) across RECONNECTING <-> CONTENT.
+        BoardStatus.CONTENT, BoardStatus.RECONNECTING -> {
+            val reconnecting = state.boardStatus == BoardStatus.RECONNECTING
+            Box(modifier = modifier.fillMaxSize()) {
+                QuotesBoard(
+                    state = state,
+                    modifier = Modifier
+                        .alpha(if (reconnecting) RECONNECTING_BOARD_ALPHA else 1f)
+                        .then(if (reconnecting) Modifier.clearAndSetSemantics {} else Modifier),
+                )
+                if (reconnecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .semantics {
+                                contentDescription = "Reconnecting"
+                                liveRegion = LiveRegionMode.Polite
+                            },
+                    )
                 }
             }
         }
     }
 }
 
-/** Full-screen placeholder shown when the socket has never delivered any data. */
+@Composable
+private fun QuotesBoard(
+    state: QuotesState,
+    modifier: Modifier = Modifier,
+) {
+    // Tickers are known upfront (the fixed list, plus whatever the
+    // top-securities augmentation already settled on), so the real rows
+    // render immediately; a row only shimmers the specific fields it
+    // hasn't received a quote for yet, rather than hiding the whole list
+    // behind a generic loading screen. The shimmer brush is shared and
+    // created only while at least one row still needs it.
+    val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        items(items = state.rows, key = { row -> row.ticker }) { row ->
+            QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
+        }
+    }
+}
+
+/** Full-screen placeholder shown when the connection is lost after repeated failed reconnect attempts. */
 @Composable
 private fun QuotesErrorBoard(
     onRetryClick: () -> Unit,
@@ -253,6 +293,8 @@ private fun QuoteRowItem(
     }
 }
 
+/** Lining-digit height as a fraction of the font size (Roboto cap/digit height is about 0.71-0.72 em). */
+private const val DIGIT_HEIGHT_EM = 0.72f
 private const val SHIMMER_ANIMATION_MS = 1100
 private const val SHIMMER_SWEEP_WIDTH = 600f
 
@@ -378,20 +420,31 @@ private fun PercentBadge(
         FlashDirection.NONE -> Color.Transparent
     }
     val textColor = if (highlighted) Color.White else signColor(sign)
+    val textStyle = MaterialTheme.typography.titleMedium
+    // Read only while drawing (after layout), so a plain holder avoids recomposition.
+    val baseline = remember { FloatArray(1) }
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = textStyle,
+        onTextLayout = { layout -> baseline[0] = layout.firstBaseline },
         fontWeight = FontWeight.Normal,
         color = textColor,
         // The flash pill is drawn outset around the text instead of padding it, so the
         // text's right edge stays aligned with the price line below.
-        modifier = modifier.drawBehind {
+        modifier = modifier.semantics {
+            // Exposes the highlight state to UI tests; has no visual effect.
+            percentHighlighted = highlighted
+        }.drawBehind {
             if (background.alpha == 0f) return@drawBehind
             val p = 2.dp.toPx()
+            // The pill hugs the glyphs (digits, + - . % never descend below the baseline)
+            // rather than the layout box, which includes extra line-height padding.
+            val top = baseline[0] - textStyle.fontSize.toPx() * DIGIT_HEIGHT_EM - p
+            val bottom = baseline[0] + p
             drawRoundRect(
                 color = background,
-                topLeft = Offset(-p, -p),
-                size = Size(size.width + 2 * p, size.height + 2 * p),
+                topLeft = Offset(-p, top),
+                size = Size(size.width + 2 * p, bottom - top),
                 cornerRadius = CornerRadius(4.dp.toPx()),
             )
         },
@@ -416,43 +469,6 @@ private fun signColor(value: Double?): Color = when {
     value > 0 -> PositiveGreen
     value < 0 -> NegativeRed
     else -> primaryTextColor()
-}
-
-private fun formatPercent(value: Double): String = formatSigned(value) + "%"
-
-private fun formatSigned(value: Double): String {
-    val sign = if (value > 0) "+" else ""
-    return sign + formatValue(value)
-}
-
-private fun formatValue(value: Double): String =
-    BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
-
-/**
- * Formats a price-scale value (last price or its points delta) per the
- * `min-step-price-formatting` spec: when [minStep] is known, round to its
- * nearest multiple and pad to exactly its own decimal-place count; otherwise
- * fall back to the board's default trailing-zero-stripped display.
- */
-private fun formatPrice(value: Double, minStep: Double?): String =
-    if (minStep != null && minStep > 0.0) roundToMinStep(value, minStep).toPlainString() else formatValue(value)
-
-private fun formatSignedPrice(value: Double, minStep: Double?): String {
-    val sign = if (value > 0) "+" else ""
-    return sign + formatPrice(value, minStep)
-}
-
-/**
- * Rounds [value] to the nearest multiple of [minStep] and scales the result
- * to [minStep]'s own decimal-place count (its scale after stripping trailing
- * zeros), so e.g. a 0.0001 step always yields 4 decimal places, even if some
- * are zero.
- */
-private fun roundToMinStep(value: Double, minStep: Double): BigDecimal {
-    val step = BigDecimal.valueOf(minStep)
-    val decimalPlaces = step.stripTrailingZeros().scale().coerceAtLeast(0)
-    val steps = BigDecimal.valueOf(value).divide(step, 0, RoundingMode.HALF_UP)
-    return steps.multiply(step).setScale(decimalPlaces, RoundingMode.HALF_UP)
 }
 
 @Preview(showBackground = true)
@@ -527,6 +543,22 @@ private fun QuotesScreenErrorPreview() {
     MaterialTheme {
         QuotesScreen(
             state = QuotesState(boardStatus = BoardStatus.ERROR),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenReconnectingPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(
+                rows = FixedTickers.ALL.map {
+                    QuoteRow(ticker = it, logoUrl = "https://example.com/logo.png")
+                },
+                boardStatus = BoardStatus.RECONNECTING,
+            ),
             onAction = {},
         )
     }

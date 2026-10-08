@@ -4,6 +4,8 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -64,26 +66,37 @@ fun QuotesRoot(
         }
     }
 
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
-        QuotesScreen(
-            state = state,
-            onRetryClick = onRetryClick,
-            modifier = Modifier.padding(innerPadding),
-        )
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            // Edge-to-edge: the list scrolls behind the system bars, so the insets go
+            // to its contentPadding instead of clipping it with Modifier.padding.
+            QuotesScreen(
+                state = state,
+                onRetryClick = onRetryClick,
+                contentPadding = innerPadding,
+                modifier = Modifier.consumeWindowInsets(innerPadding),
+            )
+        }
+        StatusBarProtection()
     }
 }
 
-/** Pure renderer: takes state and a retry callback; owns no logic, socket, or data source. */
+/**
+ * Pure renderer: takes state and a retry callback; owns no logic, socket, or data source.
+ * [contentPadding] carries the system-bar insets: the board scrolls behind them, while
+ * the error placeholder and the spinner stay inside them.
+ */
 @Composable
 internal fun QuotesScreen(
     state: QuotesState,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
 ) {
     when (state.boardStatus) {
         BoardStatus.ERROR -> QuotesErrorBoard(
             onRetryClick = onRetryClick,
-            modifier = modifier,
+            modifier = modifier.padding(contentPadding),
         )
         // One branch for both statuses so the board keeps its composition (scroll
         // position, loaded logos) across RECONNECTING <-> CONTENT.
@@ -92,6 +105,7 @@ internal fun QuotesScreen(
             Box(modifier = modifier.fillMaxSize()) {
                 QuotesBoard(
                     state = state,
+                    contentPadding = contentPadding,
                     modifier = Modifier
                         .alpha(if (reconnecting) RECONNECTING_BOARD_ALPHA else 1f)
                         .then(if (reconnecting) Modifier.clearAndSetSemantics {} else Modifier),
@@ -115,6 +129,7 @@ internal fun QuotesScreen(
 @Composable
 private fun QuotesBoard(
     state: QuotesState,
+    contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     // Tickers are known upfront (the fixed list, plus whatever the
@@ -124,7 +139,7 @@ private fun QuotesBoard(
     // behind a generic loading screen. The shimmer brush is shared and
     // created only while at least one row still needs it.
     val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
-    LazyColumn(modifier = modifier.fillMaxSize()) {
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = contentPadding) {
         items(items = state.rows, key = { row -> row.ticker }) { row ->
             QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
         }

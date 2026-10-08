@@ -26,6 +26,10 @@ private const val FLASH_DURATION_MS = 300L
 /** Lining-digit height as a fraction of the font size (Roboto cap/digit height is about 0.71-0.72 em). */
 private const val DIGIT_HEIGHT_EM = 0.72f
 
+/** Outset of the flash pill around the glyphs. */
+private val PillHorizontalPadding = 2.dp
+private val PillVerticalPadding = 4.dp
+
 /** Test-only semantics flag: true while the percent badge shows its tick highlight. */
 internal val PercentHighlighted = SemanticsPropertyKey<Boolean>("PercentHighlighted")
 private var SemanticsPropertyReceiver.percentHighlighted by PercentHighlighted
@@ -80,15 +84,16 @@ internal fun PercentBadge(
             percentHighlighted = highlighted
         }.drawBehind {
             if (background.alpha == 0f) return@drawBehind
-            val p = 2.dp.toPx()
+            val px = PillHorizontalPadding.toPx()
+            val py = PillVerticalPadding.toPx()
             // The pill hugs the glyphs (digits, + - . % never descend below the baseline)
             // rather than the layout box, which includes extra line-height padding.
-            val top = baseline[0] - textStyle.fontSize.toPx() * DIGIT_HEIGHT_EM - p
-            val bottom = baseline[0] + p
+            val top = baseline[0] - textStyle.fontSize.toPx() * DIGIT_HEIGHT_EM - py
+            val bottom = baseline[0] + py
             drawRoundRect(
                 color = background,
-                topLeft = Offset(-p, top),
-                size = Size(size.width + 2 * p, bottom - top),
+                topLeft = Offset(-px, top),
+                size = Size(size.width + 2 * px, bottom - top),
                 cornerRadius = CornerRadius(4.dp.toPx()),
             )
         },

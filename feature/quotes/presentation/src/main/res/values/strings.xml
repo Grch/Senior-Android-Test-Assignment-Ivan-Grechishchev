@@ -1,0 +1,5 @@
+<resources>
+    <string name="quotes_error_title">Oops, seems we\'ve got an error</string>
+    <string name="quotes_error_retry">Try again</string>
+    <string name="quotes_reconnecting">Reconnecting</string>
+</resources>

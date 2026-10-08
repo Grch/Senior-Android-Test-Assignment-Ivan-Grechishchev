@@ -6,13 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.grch.tradernettestasignment"
+    namespace = "com.grch.tradernettestassignment"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.grch.tradernettestasignment"
+        applicationId = "com.grch.tradernettestassignment"
         minSdk = 28
         targetSdk = 37
         versionCode = 1

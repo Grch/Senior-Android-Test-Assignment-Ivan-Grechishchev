@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.grch.tradernettestasignment.feature.quotes.presentation"
+    namespace = "com.grch.tradernettestassignment.feature.quotes.presentation"
     compileSdk {
         version = release(37)
     }

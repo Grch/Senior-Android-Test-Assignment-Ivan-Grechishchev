@@ -1,0 +1,5 @@
+<resources>
+    <string name="quotes_error_title">Упс, кажется, что-то пошло не так</string>
+    <string name="quotes_error_retry">Попробовать снова</string>
+    <string name="quotes_reconnecting">Переподключение</string>
+</resources>

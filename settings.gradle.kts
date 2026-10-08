@@ -22,7 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Tradernet Test Asignment"
+rootProject.name = "Tradernet Test Assignment"
 include(":app")
 include(":feature:quotes:domain")
 include(":feature:quotes:data")

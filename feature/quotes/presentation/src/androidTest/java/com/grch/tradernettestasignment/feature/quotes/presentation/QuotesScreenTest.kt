@@ -3,10 +3,14 @@ package com.grch.tradernettestasignment.feature.quotes.presentation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -75,6 +79,56 @@ class QuotesScreenTest {
         composeRule.onNodeWithText("Try again").performClick()
 
         assertEquals(listOf<QuotesAction>(QuotesAction.OnRetryClicked), actions)
+    }
+
+    private val progressIndicator =
+        SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)
+
+    @Test
+    fun reconnectingShowsRowsAndSpinnerButNoRetry() {
+        composeRule.setContent {
+            QuotesScreen(
+                state = QuotesState(rows = listOf(row), boardStatus = BoardStatus.RECONNECTING),
+                onAction = {},
+            )
+        }
+
+        // Rows are hidden from semantics while reconnecting (screen readers skip the dimmed board).
+        composeRule.onAllNodesWithText("AAPL.US").assertCountEquals(0)
+        composeRule.onNode(progressIndicator).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Reconnecting").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Try again").assertCountEquals(0)
+    }
+
+    @Test
+    fun reconnectingToContentKeepsRowsAndScrollPosition() {
+        val rows = (1..60).map { row.copy(ticker = "T$it.US") }
+        var status by mutableStateOf(BoardStatus.CONTENT)
+        composeRule.setContent {
+            QuotesScreen(state = QuotesState(rows = rows, boardStatus = status), onAction = {})
+        }
+        composeRule.onNode(hasScrollAction()).performScrollToIndex(30)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("T31.US").assertIsDisplayed()
+
+        status = BoardStatus.RECONNECTING
+        composeRule.waitForIdle()
+        composeRule.onNode(progressIndicator).assertIsDisplayed()
+
+        status = BoardStatus.CONTENT
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(progressIndicator).assertCountEquals(0)
+        composeRule.onNodeWithText("T31.US").assertIsDisplayed()
+        composeRule.onAllNodesWithText("T1.US").assertCountEquals(0)
+    }
+
+    @Test
+    fun contentShowsNoSpinner() {
+        composeRule.setContent {
+            QuotesScreen(state = QuotesState(rows = listOf(row)), onAction = {})
+        }
+
+        composeRule.onAllNodes(progressIndicator).assertCountEquals(0)
     }
 
     @Test

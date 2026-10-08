@@ -226,11 +226,12 @@ class QuotesViewModelTest {
     }
 
     @Test
-    fun `retry while not started does nothing`() = runTest {
+    fun `retry while not started shows reconnecting but does not subscribe`() = runTest {
         val vm = viewModel()
 
         vm.onAction(QuotesAction.OnRetryClicked)
 
+        assertEquals(BoardStatus.RECONNECTING, vm.state.value.boardStatus)
         assertTrue(repository.requestedTickers.isEmpty())
         assertEquals(0, repository.activeCollections)
         assertFalse(vm.state.value.isStreaming)
@@ -326,7 +327,7 @@ class QuotesViewModelTest {
     }
 
     @Test
-    fun `retry from error returns to content with a fresh collection`() = runTest {
+    fun `retry from error shows reconnecting with a fresh collection`() = runTest {
         val vm = viewModel()
         vm.onAction(QuotesAction.OnScreenStarted(true))
         emitEvent(QuoteStreamEvent.ConnectionLost)
@@ -334,9 +335,48 @@ class QuotesViewModelTest {
 
         vm.onAction(QuotesAction.OnRetryClicked)
 
-        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
+        assertEquals(BoardStatus.RECONNECTING, vm.state.value.boardStatus)
         assertEquals(listOf(FixedTickers.ALL, FixedTickers.ALL), repository.requestedTickers)
         assertEquals(1, repository.activeCollections)
+    }
+
+    private fun QuotesViewModel.startAndRetryFromError() {
+        onAction(QuotesAction.OnScreenStarted(true))
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+        onAction(QuotesAction.OnRetryClicked)
+        assertEquals(BoardStatus.RECONNECTING, state.value.boardStatus)
+    }
+
+    @Test
+    fun `disconnected during reconnecting stays reconnecting until connected`() = runTest {
+        val vm = viewModel()
+        vm.startAndRetryFromError()
+
+        emitEvent(QuoteStreamEvent.Disconnected)
+        assertEquals(BoardStatus.RECONNECTING, vm.state.value.boardStatus)
+
+        emitEvent(QuoteStreamEvent.Connected)
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
+    }
+
+    @Test
+    fun `connection lost during reconnecting returns to error`() = runTest {
+        val vm = viewModel()
+        vm.startAndRetryFromError()
+
+        emitEvent(QuoteStreamEvent.ConnectionLost)
+
+        assertEquals(BoardStatus.ERROR, vm.state.value.boardStatus)
+    }
+
+    @Test
+    fun `update for a known ticker during reconnecting shows content`() = runTest {
+        val vm = viewModel()
+        vm.startAndRetryFromError()
+
+        emitQuote(tickerA, price = 1.0)
+
+        assertEquals(BoardStatus.CONTENT, vm.state.value.boardStatus)
     }
 
     @Test

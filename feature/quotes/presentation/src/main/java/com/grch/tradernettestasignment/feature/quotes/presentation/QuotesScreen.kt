@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -46,8 +48,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +76,7 @@ private val NegativeRed = Color(0xFFD64545)
 private const val PLACEHOLDER = "—"
 private const val FLASH_DURATION_MS = 300L
 private val LogoSize = 20.dp
+private const val RECONNECTING_BOARD_ALPHA = 0.4f
 
 /** Test-only semantics flag: true while the percent badge shows its tick highlight. */
 internal val PercentHighlighted = SemanticsPropertyKey<Boolean>("PercentHighlighted")
@@ -125,19 +132,47 @@ fun QuotesScreen(
             onRetryClick = { onAction(QuotesAction.OnRetryClicked) },
             modifier = modifier,
         )
-        BoardStatus.CONTENT -> {
-            // Tickers are known upfront (the fixed list, plus whatever the
-            // top-securities augmentation already settled on), so the real rows
-            // render immediately; a row only shimmers the specific fields it
-            // hasn't received a quote for yet, rather than hiding the whole list
-            // behind a generic loading screen. The shimmer brush is shared and
-            // created only while at least one row still needs it.
-            val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
-            LazyColumn(modifier = modifier.fillMaxSize()) {
-                items(items = state.rows, key = { row -> row.ticker }) { row ->
-                    QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
+        // One branch for both statuses so the board keeps its composition (scroll
+        // position, loaded logos) across RECONNECTING <-> CONTENT.
+        BoardStatus.CONTENT, BoardStatus.RECONNECTING -> {
+            val reconnecting = state.boardStatus == BoardStatus.RECONNECTING
+            Box(modifier = modifier.fillMaxSize()) {
+                QuotesBoard(
+                    state = state,
+                    modifier = Modifier
+                        .alpha(if (reconnecting) RECONNECTING_BOARD_ALPHA else 1f)
+                        .then(if (reconnecting) Modifier.clearAndSetSemantics {} else Modifier),
+                )
+                if (reconnecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .semantics {
+                                contentDescription = "Reconnecting"
+                                liveRegion = LiveRegionMode.Polite
+                            },
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuotesBoard(
+    state: QuotesState,
+    modifier: Modifier = Modifier,
+) {
+    // Tickers are known upfront (the fixed list, plus whatever the
+    // top-securities augmentation already settled on), so the real rows
+    // render immediately; a row only shimmers the specific fields it
+    // hasn't received a quote for yet, rather than hiding the whole list
+    // behind a generic loading screen. The shimmer brush is shared and
+    // created only while at least one row still needs it.
+    val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        items(items = state.rows, key = { row -> row.ticker }) { row ->
+            QuoteRowItem(row = row, shimmerBrush = shimmerBrush)
         }
     }
 }
@@ -508,6 +543,22 @@ private fun QuotesScreenErrorPreview() {
     MaterialTheme {
         QuotesScreen(
             state = QuotesState(boardStatus = BoardStatus.ERROR),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun QuotesScreenReconnectingPreview() {
+    MaterialTheme {
+        QuotesScreen(
+            state = QuotesState(
+                rows = FixedTickers.ALL.map {
+                    QuoteRow(ticker = it, logoUrl = "https://example.com/logo.png")
+                },
+                boardStatus = BoardStatus.RECONNECTING,
+            ),
             onAction = {},
         )
     }

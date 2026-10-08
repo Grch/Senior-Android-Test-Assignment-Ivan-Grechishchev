@@ -50,7 +50,9 @@ import kotlinx.coroutines.launch
  * data ever arrived. A plain [QuoteStreamEvent.Disconnected] keeps showing the last
  * data (or shimmer) while the data layer reconnects. Any quote merged from a source
  * moves the status back to [BoardStatus.CONTENT], as does a successful
- * [QuoteStreamEvent.Connected] or a manual retry.
+ * [QuoteStreamEvent.Connected]. A manual retry moves it to [BoardStatus.RECONNECTING]
+ * until the socket connects (or an update arrives) -> CONTENT, or the data layer
+ * gives up again -> [BoardStatus.ERROR]; a plain Disconnected leaves it unchanged.
  */
 @HiltViewModel
 class QuotesViewModel @Inject constructor(
@@ -93,11 +95,11 @@ class QuotesViewModel @Inject constructor(
             is QuotesAction.OnScreenStarted -> isStarted.value = action.isStarted
 
             QuotesAction.OnRetryClicked -> {
-                // A manual nudge: leave the error placeholder and reconnect right
-                // away, bypassing the data layer's own retry delay. Rows already
-                // carry whatever they had before, and keep shimmering any field
-                // that's still unknown.
-                _state.update { it.copy(boardStatus = BoardStatus.CONTENT) }
+                // A manual nudge: reconnect right away, bypassing the data layer's
+                // own retry delay. Show the board dimmed with a spinner
+                // (RECONNECTING) until Connected/Update confirms the socket, or
+                // ConnectionLost sends us back to the error placeholder.
+                _state.update { it.copy(boardStatus = BoardStatus.RECONNECTING) }
                 retries.update { it + 1 }
             }
         }
@@ -191,9 +193,10 @@ class QuotesViewModel @Inject constructor(
     /**
      * Routes a stream event: a [QuoteStreamEvent.Update] merges into its row.
      * [QuoteStreamEvent.Disconnected] is ignored — the data layer is reconnecting
-     * and the board keeps showing its last data or shimmer.
-     * [QuoteStreamEvent.Connected] clears a prior error placeholder, so a successful
-     * (re)connect never leaves the error shown over a live socket.
+     * and the board keeps showing its last data or shimmer (a manual
+     * [BoardStatus.RECONNECTING] stays as is).
+     * [QuoteStreamEvent.Connected] clears a prior error placeholder or reconnecting
+     * spinner, so a successful (re)connect never leaves them over a live socket.
      * [QuoteStreamEvent.ConnectionLost] is terminal (the data layer gave up and
      * the stream completes), so the UI switches to the error placeholder
      * regardless of whether data ever arrived; the user can retry manually.

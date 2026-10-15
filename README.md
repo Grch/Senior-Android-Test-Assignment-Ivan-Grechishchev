@@ -1,8 +1,8 @@
 <p align="center"><img src="docs/logo.png" width="120"></p>
 
-# Tradernet Quotes
+# Tr****net Quotes
 
-An Android test assignment: a single Jetpack Compose screen (MVVM) showing a live quotes board in the style of the Tradernet app, fed by the Tradernet WebSocket API (`wss://wss.tradernet.com`).
+An Android test assignment: a single Jetpack Compose screen (MVVM) showing a live quotes board in the style of the t*****net app, fed by the t*****net WebSocket API (`wss://wss.t*****net.com`).
 
 ## Features
 
@@ -10,7 +10,7 @@ An Android test assignment: a single Jetpack Compose screen (MVVM) showing a liv
 - Rows render immediately; a shimmer is shown only for fields that have no data yet.
 - The percent-change badge flashes green or red for 300 ms when the last price ticks up or down.
 - Prices and changes are rounded to the security's `min_step`.
-- Company logos loaded from `https://tradernet.com/logos/get-logo-by-ticker?ticker=<lowercase ticker>`.
+- Company logos loaded from `https://t*****net.com/logos/get-logo-by-ticker?ticker=<lowercase ticker>`.
 - Extra tickers from the top-securities REST endpoint (stocks, exchange `russia`, gainers `0`, limit 30).
 - The socket is closed when the app goes to the background and survives rotation.
 - Connection loss handling: automatic reconnect, then an error screen with "Try again" (details below).
@@ -18,7 +18,7 @@ An Android test assignment: a single Jetpack Compose screen (MVVM) showing a liv
 
 ## Architecture
 
-Package root: `com.grch.tradernettestassignment`. The quotes feature is split into three layers.
+Package root: `com.grch.t*****nettestassignment`. The quotes feature is split into three layers.
 
 ```text
 :app                           Hilt composition root (@HiltAndroidApp), theme, single activity

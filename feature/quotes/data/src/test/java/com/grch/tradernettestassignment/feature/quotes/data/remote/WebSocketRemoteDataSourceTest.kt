@@ -32,11 +32,8 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Drives the real [WebSocketRemoteDataSource] against a MockWebServer. The production socket URL
- * is fixed, so an application interceptor redirects every request to the local server.
- * The repository uses [Dispatchers.Unconfined] because these tests rely on real time (real socket I/O
- * and reconnect delays), which a virtual-time test dispatcher would not advance.
- * Reconnect waits use a short [RECONNECT_DELAY] so the tests stay fast (bounded by [TIMEOUT_MS]).
+ * Runs the real [WebSocketRemoteDataSource] against a MockWebServer (an interceptor redirects the fixed URL).
+ * Uses [Dispatchers.Unconfined] and a short [RECONNECT_DELAY] because the tests rely on real time.
  */
 class WebSocketRemoteDataSourceTest {
     private lateinit var server: MockWebServer

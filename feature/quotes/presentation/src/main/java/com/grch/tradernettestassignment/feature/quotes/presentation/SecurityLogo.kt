@@ -26,13 +26,8 @@ import coil3.request.crossfade
 private val LogoSize = 20.dp
 
 /**
- * A security's logo on a neutral monogram tile. The monogram shows only while
- * no real logo is displayed: during loading, on a load failure, and on
- * Tradernet's own "no logo" response (a 1x1 fully transparent GIF, not an HTTP
- * error — see [QuoteRow.logoUrl]), detected by its 1x1 intrinsic size
- * since it otherwise reports as a successful load. Once a real logo loads, the
- * monogram is removed rather than left underneath, since most brand logos have
- * a transparent background and would otherwise show both at once.
+ * A security logo on a monogram tile. The monogram is removed once a real logo loads; Tradernet's 1x1
+ * transparent "no logo" GIF is detected by its intrinsic size and treated as not loaded.
  */
 @Composable
 internal fun SecurityLogo(ticker: String, logoUrl: String, modifier: Modifier = Modifier) {

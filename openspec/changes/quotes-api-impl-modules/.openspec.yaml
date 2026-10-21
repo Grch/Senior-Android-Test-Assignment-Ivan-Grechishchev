@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-07
+goal: Split quotes into framework-free API and Android implementation modules
+  and wire the live feature with Hilt while preserving behavior.

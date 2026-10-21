@@ -31,13 +31,3 @@ local.properties
 # Misc
 .DS_Store
 *.log
-
-# Personal opencode skills/agents
-/.opencode/
-
-# Personal Claude agents/commands/skills
-/.claude/
-/CLAUDE.md
-
-# OpenSpec (local tooling/artifacts)
-/openspec/

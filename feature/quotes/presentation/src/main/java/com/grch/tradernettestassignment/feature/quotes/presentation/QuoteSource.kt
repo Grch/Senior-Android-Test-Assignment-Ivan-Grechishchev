@@ -1,14 +1,6 @@
 package com.grch.tradernettestassignment.feature.quotes.presentation
 
-/**
- * The source that currently supplies the board's active ticker set. A read-only
- * state indicator, not a user-selectable input.
- *
- * [FIXED] means only the fixed watchlist is active: the top-securities request is
- * still in flight, failed, or returned no ticker beyond the fixed list.
- * [AUGMENTED] means the fixed watchlist plus extra tickers appended from a
- * non-empty top-securities response.
- */
+/** Which ticker set is active: [FIXED] is the watchlist only, [AUGMENTED] adds top-securities tickers. */
 internal enum class QuoteSource {
     /** Only the fixed watchlist is the active ticker set. */
     FIXED,

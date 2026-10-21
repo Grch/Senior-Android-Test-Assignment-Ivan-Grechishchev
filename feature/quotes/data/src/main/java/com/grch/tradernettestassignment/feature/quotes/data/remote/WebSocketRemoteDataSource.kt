@@ -31,7 +31,7 @@ internal sealed interface SocketEvent {
     data object GaveUp : SocketEvent
 }
 
-/** Owns the raw, unauthenticated Tradernet WebSocket connection and its retries. */
+/** Owns the Tradernet WebSocket connection and its retries. */
 internal class WebSocketRemoteDataSource internal constructor(
     private val client: OkHttpClient,
     private val maxAttempts: Int,
@@ -40,16 +40,10 @@ internal class WebSocketRemoteDataSource internal constructor(
     @Inject
     constructor(client: OkHttpClient) : this(client, DEFAULT_MAX_ATTEMPTS, DEFAULT_RECONNECT_DELAY)
 
-    /**
-     * Emits connection lifecycle events and unmodified text frames, reconnecting
-     * after a disconnect while collected. [SocketEvent.Closed] is emitted after
-     * every ended attempt, whether or not it ever reached [SocketEvent.Opened].
-     *
-     * A failed attempt is one that never reaches onOpen; a successful open resets
-     * the consecutive-failure count, and a drop of an open connection is not itself
-     * an attempt (it only schedules the next one after [reconnectDelay]). After
-     * [maxAttempts] consecutive failed attempts, [SocketEvent.GaveUp] is emitted
-     * and the flow completes.
+/**
+     * Emits lifecycle events and raw text frames, reconnecting while collected. [SocketEvent.Closed] follows
+     * every ended attempt. An attempt fails if it never reaches onOpen; an open resets the failure count.
+     * After [maxAttempts] consecutive failures, [SocketEvent.GaveUp] is emitted and the flow completes.
      */
     internal fun observeFrames(tickers: List<String>): Flow<SocketEvent> = flow {
         var failedAttempts = 0

@@ -1,12 +1,6 @@
 package com.grch.tradernettestassignment.feature.quotes.domain.model
 
-/**
- * The fixed, ordered watchlist rendered by the quotes board.
- *
- * The order is required and MUST be preserved: updates never reorder, add, or
- * remove entries. Both the socket subscription
- * and the UI seed use this single source of truth.
- */
+/** The fixed, ordered watchlist; used for both the socket subscription and the initial rows. */
 object FixedTickers {
     val ALL: List<String> = listOf(
         "SP500.IDX",

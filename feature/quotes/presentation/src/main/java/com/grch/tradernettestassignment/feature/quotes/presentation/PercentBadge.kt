@@ -34,11 +34,7 @@ private val PillVerticalPadding = 4.dp
 internal val PercentHighlighted = SemanticsPropertyKey<Boolean>("PercentHighlighted")
 private var SemanticsPropertyReceiver.percentHighlighted by PercentHighlighted
 
-/**
- * The percent-change value, highlighted on a tick: a solid green/red pill with
- * white text for [FLASH_DURATION_MS] after [flashTick] changes, then plain
- * sign-colored text. Only this badge highlights — not the row.
- */
+/** The percent change; on a tick it shows a green/red pill with white text for [FLASH_DURATION_MS]. */
 @Composable
 internal fun PercentBadge(
     text: String,
@@ -49,8 +45,7 @@ internal fun PercentBadge(
 ) {
     val firstSeenTick = remember { flashTick } // don't flash a row just because it (re)entered composition
     var highlighted by remember { mutableStateOf(false) }
-    // The timer lives in the UI: a new tick changes the key, so Compose cancels the
-    // previous highlight and restarts it.
+    // A new tick changes the key, so Compose restarts the highlight timer.
     LaunchedEffect(flashTick) {
         if (flashTick == firstSeenTick) {
             highlighted = false

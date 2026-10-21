@@ -40,10 +40,7 @@ import com.grch.tradernettestassignment.feature.quotes.domain.model.FixedTickers
 
 private const val RECONNECTING_BOARD_ALPHA = 0.4f
 
-/**
- * Stateful entry to the quotes screen. Holds the [QuotesViewModel], reports the
- * started/stopped lifecycle to it, observes state, and forwards the retry click.
- */
+/** Stateful entry: ties the [QuotesViewModel] to the lifecycle and renders its state. */
 @Composable
 fun QuotesRoot(
     modifier: Modifier = Modifier,
@@ -82,9 +79,8 @@ fun QuotesRoot(
 }
 
 /**
- * Pure renderer: takes state and a retry callback; owns no logic, socket, or data source.
- * [contentPadding] carries the system-bar insets: the board scrolls behind them, while
- * the error placeholder and the spinner stay inside them.
+ * Stateless renderer. [contentPadding] carries the system-bar insets: the board scrolls behind them,
+ * the error placeholder and spinner stay inside.
  */
 @Composable
 internal fun QuotesScreen(
@@ -132,12 +128,7 @@ private fun QuotesBoard(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
-    // Tickers are known upfront (the fixed list, plus whatever the
-    // top-securities augmentation already settled on), so the real rows
-    // render immediately; a row only shimmers the specific fields it
-    // hasn't received a quote for yet, rather than hiding the whole list
-    // behind a generic loading screen. The shimmer brush is shared and
-    // created only while at least one row still needs it.
+    // Tickers are known upfront, so rows render at once and shimmer only the fields still missing.
     val shimmerBrush = if (state.rows.any { it.lastPrice == null }) rememberShimmerBrush() else null
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = contentPadding) {
         items(items = state.rows, key = { row -> row.ticker }) { row ->

@@ -23,12 +23,7 @@ import androidx.compose.ui.unit.dp
 private const val PLACEHOLDER = "—"
 private const val PENDING_NAME_WIDTH_FRACTION = 0.55f
 
-/**
- * A single watchlist row. While [row] has no [QuoteRow.lastPrice] yet (no quote
- * frame has arrived for it), the name/exchange line and the whole price area
- * shimmer using [shimmerBrush] instead of showing a dash — the ticker itself is
- * always known upfront, so only it and the logo render immediately either way.
- */
+/** A watchlist row; fields without a quote yet shimmer via [shimmerBrush]. */
 @Composable
 internal fun QuoteRowItem(
     row: QuoteRow,

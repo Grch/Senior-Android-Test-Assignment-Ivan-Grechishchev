@@ -4,12 +4,8 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * DTO for the named object at index 1 of the verified Tradernet `q` frame.
- * The documented fields (`c`, `ltr`, `name`, `ltp`, `chg`, `pcp`, `pp`,
- * `min_step`) use names rather than array positions, and all but the ticker
- * remain nullable because later quote frames may contain partial updates;
- * `min_step` in particular is live-verified to arrive only on a ticker's
- * first frame.
+ * `q` frame payload (index 1). Everything except the ticker is nullable: later frames are partial
+ * updates, and `min_step` arrives only on a ticker's first frame.
  */
 @JsonClass(generateAdapter = true)
 internal data class QuotePayloadDto(

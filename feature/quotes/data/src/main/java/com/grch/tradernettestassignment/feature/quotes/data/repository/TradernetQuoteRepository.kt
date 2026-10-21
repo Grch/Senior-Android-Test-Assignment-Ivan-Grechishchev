@@ -12,12 +12,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapNotNull
 import javax.inject.Inject
 
-/**
- * Decodes raw Tradernet quote frames and maps valid partial updates and connection events to domain values.
- *
- * Parsing is CPU work, so the stream runs on [defaultDispatcher]; the socket itself already runs on
- * OkHttp's threads.
- */
+/** Decodes raw quote frames into domain events; parsing runs on [defaultDispatcher], not the socket threads. */
 internal class TradernetQuoteRepository @Inject constructor(
     private val remoteDataSource: WebSocketRemoteDataSource,
     private val parser: QuoteMessageParser,

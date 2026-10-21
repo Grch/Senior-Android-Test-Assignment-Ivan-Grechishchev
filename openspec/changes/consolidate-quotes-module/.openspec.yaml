@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-07
+goal: Keep quotes implementation in :feature:quotes and render QuotesRoot
+  directly from MainActivity

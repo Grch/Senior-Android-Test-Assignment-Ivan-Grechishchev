@@ -1,4 +1,3 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -23,12 +22,9 @@ allprojects {
     }
 }
 
-// --- Static analysis & coverage -------------------------------------------------------------
-
 val composeRulesDetekt = libs.compose.rules.detekt
 
-// Generated code and previews are excluded from coverage. The root report aggregates the modules
-// and needs the same filters as the per-module reports.
+// Generated code and previews are excluded from coverage; the root report needs the same filters.
 val koverExcludes: kotlinx.kover.gradle.plugin.dsl.KoverReportFiltersConfig.() -> Unit = {
     excludes {
         classes(
@@ -61,7 +57,7 @@ val koverExcludes: kotlinx.kover.gradle.plugin.dsl.KoverReportFiltersConfig.() -
 
 kover.reports.filters(koverExcludes)
 
-// Only real modules; :feature and :feature:quotes are empty containers without a build file.
+// Only real modules; :feature and :feature:quotes have no build file.
 val realModules = subprojects.filter { it.buildFile.exists() }
 
 configure(realModules) {

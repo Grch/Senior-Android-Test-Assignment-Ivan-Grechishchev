@@ -41,11 +41,7 @@ internal fun rememberShimmerBrush(): Brush {
     )
 }
 
-/**
- * [brush] is only ever null when no row in the list is pending, in which case
- * no [QuoteRowItem] renders a [ShimmerBlock] in the first place; the solid
- * fallback only guards against that invariant being violated.
- */
+/** [brush] is null only when no row is pending, so the solid fallback is just a guard. */
 @Composable
 internal fun ShimmerBlock(brush: Brush?, modifier: Modifier = Modifier) {
     Box(

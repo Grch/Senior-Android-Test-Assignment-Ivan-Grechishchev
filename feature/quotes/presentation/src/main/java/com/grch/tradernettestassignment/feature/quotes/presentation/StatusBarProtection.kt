@@ -17,10 +17,7 @@ import androidx.compose.ui.platform.LocalDensity
 private const val SCRIM_HEIGHT_FACTOR = 1.2f
 private const val SCRIM_MID_ALPHA = 0.8f
 
-/**
- * A gradient over the status bar that keeps its icons legible while the edge-to-edge
- * list scrolls behind it. Draw it after the content.
- */
+/** A gradient that keeps status bar icons legible over the edge-to-edge list. Draw it after the content. */
 @Composable
 internal fun StatusBarProtection(
     modifier: Modifier = Modifier,

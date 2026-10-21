@@ -1,0 +1,82 @@
+# live-quotes-board (delta)
+
+This delta modifies only source membership / active-set behavior of the maintained `live-quotes-board` capability so that the top-securities API ticker set requested on quotes-screen open may become the active set, with the fixed list retained completely as the default and fallback. It does NOT change the socket framing, the no-auth requirement, the quote field mapping, the row content, sign coloring, or the lifecycle requirements, and it reproduces the affected requirements in full with their existing scenarios preserved.
+
+## MODIFIED Requirements
+
+### Requirement: Fixed watchlist order
+
+The board SHALL present exactly the following tickers, in this order, as its default source:
+
+`SP500.IDX`, `AAPL.US`, `RSTI`, `GAZP`, `MRKZ`, `RUAL`, `HYDR`, `MRKS`, `SBER`, `FEES`, `TGKA`, `VTBR`, `ANH.US`, `VICL.US`, `BURG.US`, `NBL.US`, `YETI.US`, `WSFS.US`, `NIO.US`, `DXC.US`, `MIC.US`, `HSBC.US`, `EXPN.EU`, `GSK.EU`, `SHP.EU`, `MAN.EU`, `DB1.EU`, `MUV2.EU`, `TATE.EU`, `KGF.EU`, `MGGT.EU`, `SGGD.EU`, `AI.US`.
+
+The board SHALL NOT insert, remove, reorder, or re-sort these entries based on arriving data.
+
+The fixed list SHALL be the default and fallback active set. Whenever the quotes screen opens, the board requests the top-securities API (see the `top-securities-source` capability); a non-empty API ticker set becomes the active set in API order, replacing the fixed list for as long as it is active. On any failure or empty response the fixed list is the active set.
+
+#### Scenario: Board renders the fixed list in order
+
+- **WHEN** the quotes board is shown with the default source
+- **THEN** it renders one row for each ticker above
+- **AND** the rows appear in the exact order listed
+
+#### Scenario: Data arrival does not reorder rows
+
+- **WHEN** a quote update arrives for a ticker already in the list
+- **THEN** that ticker's row stays in its original position
+- **AND** no new ticker outside the list is added
+
+#### Scenario: A non-empty API ticker set becomes the active set on screen open
+
+- **WHEN** the quotes screen opens and the top-securities API returns a non-empty ticker set
+- **THEN** the board's active set is that API ticker set in the order supplied by the API
+- **AND** the fixed list is the active set whenever the API fails or is empty
+
+### Requirement: No-auth live subscription over the Tradernet socket
+
+The system SHALL connect to the WebSocket host `wss.tradernet.com` without sending authentication credentials. The subscription SHALL be a single WebSocket JSON text frame whose value is `["quotes", [<ticker>, ...]]`, using the current active ticker set: the first element is the literal event name `quotes` and the second element is the ticker array. The active ticker set is the fixed watchlist tickers by default, or the API ticker set when the screen-open top-securities request returns a non-empty set. The intended subscription value is specified by the assignment PDF and by the official Tradernet example at `https://tradernet.com/tradernet-api/get-example?id=quotes-get-changes` (page `https://tradernet.com/tradernet-api/quotes-get-changes/?site_lang=en`). The official page's browser helper shows a two-argument `ws.send("quotes", ...)`, which is an invalid native WebSocket call; the runtime probe verifies that the valid one-frame serialized form above is accepted. Changing the active ticker set does not change this framing; it only changes the ticker array carried by the same frame.
+
+Incoming update messages SHALL be read as a top-level JSON array in which index 0 is the event name `q`, index 1 is a single JSON object carrying the quote fields, and any optional trailing element `wstm=...` is a server timestamp that SHALL be ignored. The quote object's field names and meanings are cited from the official documentation: `c` is the ticker, `ltr` is the last-trade exchange, `name` is the security name, `pp` is the previous close, `ltp` is the last-trade price, `chg` is the signed point change versus the previous close, and `pcp` is the percent change versus the previous close. The actual `q` envelope shape (top-level array with the quote object at index 1) and the optional trailing `wstm=...` timestamp are based on live-probe evidence recorded in design.md and tasks.md. The documentation's example renders the `q` payload as an object while the page's helper is array-oriented (`data.forEach`, `QuoteInfoAnswer[]`); the runtime probe resolves that conflict to the single object at index 1, and only that object form SHALL be handled.
+
+#### Scenario: Connection is unauthenticated
+
+- **WHEN** the board opens its live connection
+- **THEN** it connects to `wss.tradernet.com` without requiring or sending a token, login, or session credential
+
+#### Scenario: Subscription uses the documented quotes event
+
+- **WHEN** the connection is established
+- **THEN** the client sends one text frame whose value is `["quotes", [<active tickers>]]`
+- **AND** the first element is the literal `quotes` event name and the second element is the active ticker array
+- **AND** the invalid two-argument `ws.send("quotes", ...)` browser helper form is not used
+
+#### Scenario: Update field mapping is documentation-backed
+
+- **WHEN** an update message delivered under `q` is mapped to a row
+- **THEN** the message is treated as a top-level array with the event `q` at index 0 and a single quote object at index 1
+- **AND** any optional trailing `wstm=...` timestamp element is ignored
+- **AND** the named fields `c`, `ltr`, `name`, `pp`, `ltp`, `chg`, and `pcp` map to the ticker, last-trade exchange, security name, previous close, last-trade price, signed points versus close, and percent versus close respectively
+- **AND** the mapping is recorded with the field names and meanings citing the official documentation, while the actual `q` envelope shape and trailing timestamp cite live-probe evidence recorded in design.md and tasks.md
+
+### Requirement: Partial quote update merge by ticker
+
+The system SHALL key each incoming quote update by its `c` ticker and merge it into the existing row for that ticker. When a later `q` object omits a field, the row SHALL preserve its previously held non-null value for that field. The system SHALL ignore any update whose ticker is not one of the current active set tickers and SHALL NOT add a row for it. Merging SHALL NOT change the position or order of any row.
+
+#### Scenario: Partial update preserves prior values
+
+- **WHEN** a row already shows an exchange, security name, previous close, and percent change
+- **AND** a later `q` object for that ticker carries only the last-trade price
+- **THEN** the row updates its last-trade price
+- **AND** the exchange, security name, previous close, and percent change retain their prior non-null values
+
+#### Scenario: Unknown ticker is ignored
+
+- **WHEN** a `q` object arrives whose `c` ticker is not in the current active set
+- **THEN** the system ignores the update
+- **AND** no row is added or modified for that ticker
+
+#### Scenario: Merge preserves row order
+
+- **WHEN** any quote update is merged into a row
+- **THEN** the row keeps its original position
+- **AND** the order of all rows is unchanged

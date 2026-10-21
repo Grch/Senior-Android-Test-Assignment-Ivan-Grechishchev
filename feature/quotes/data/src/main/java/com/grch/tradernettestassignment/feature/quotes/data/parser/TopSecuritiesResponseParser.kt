@@ -11,11 +11,8 @@ import org.json.JSONObject
 private const val TOP_SECURITIES_LIMIT = 30
 
 /**
- * Serializes the top-securities request object for the `q` query parameter:
- *
- * `{"cmd":"getTopSecurities","params":{"type":"stocks","exchange":"russia","gainers":0,"limit":30}}`
- *
- * No auth is involved.
+ * Serializes the request for the `q` query parameter, e.g.
+ * `{"cmd":"getTopSecurities","params":{"type":"stocks","exchange":"russia","gainers":0,"limit":30}}`.
  */
 internal fun topSecuritiesRequestQuery(): String = JSONObject().apply {
     put("cmd", "getTopSecurities")
@@ -30,27 +27,15 @@ internal fun topSecuritiesRequestQuery(): String = JSONObject().apply {
     )
 }.toString()
 
-/**
- * Result of parsing a raw top-securities response body.
- *
- * [Success] carries the securities in response order. [DeclaredFailure] marks the
- * documented `code`/`error`/`errMsg` failure payload. Malformed JSON or a missing
- * `tickers` array throws [TopSecuritiesParseException] so the data source can
- * classify it as a parse failure.
- */
+/** Parse result: [Success] in response order, or [DeclaredFailure] for the `code`/`error`/`errMsg` payload. */
 internal sealed interface ParsedTopSecurities {
     data class Success(val securities: List<TopSecurityRef>) : ParsedTopSecurities
     data object DeclaredFailure : ParsedTopSecurities
 }
 
 /**
- * Parses a raw response body.
- *
- * Success shape (documented and live-verified):
- * `{"tickers":["GAZP",...],"details":{"GAZP":{"name":"..."}}}`. The ordered
- * `tickers` array supplies the ticker IDs; `details[<ticker>].name` supplies
- * optional name metadata only. Any unrelated objects (for example `buttons` in
- * the live response) are ignored.
+ * Parses `{"tickers":["GAZP",...],"details":{"GAZP":{"name":"..."}}}`; `details[<ticker>].name` is optional.
+ * Throws [TopSecuritiesParseException] on malformed JSON or a missing `tickers` array.
  */
 internal class TopSecuritiesResponseParser @Inject constructor(
     private val adapter: JsonAdapter<TopSecuritiesResponseDto>,

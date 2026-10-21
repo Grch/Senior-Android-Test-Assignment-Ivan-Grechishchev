@@ -1,4 +1,3 @@
-// Tests run under runBlocking with no virtual time, so parsing uses Dispatchers.Unconfined directly.
 @file:Suppress("InjectDispatcher")
 
 package com.grch.tradernettestassignment.feature.quotes.data.repository

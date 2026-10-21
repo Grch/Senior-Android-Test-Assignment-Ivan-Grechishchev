@@ -1,19 +1,9 @@
 package com.grch.tradernettestassignment.feature.quotes.domain.model
 
 /**
- * A single security quote update from the Tradernet `q` carrier.
- *
- * Every field except [ticker] is nullable because Tradernet sends partial
- * updates: later frames only carry the fields that changed. Consumers merge
- * non-null fields into the row keyed by [ticker].
- *
- * Field names map to the documented Tradernet quote fields
- * (`https://tradernet.com/tradernet-api/quotes-get-changes/?site_lang=en`):
- * `c` -> [ticker], `ltr` -> [exchange], `name` -> [name], `ltp` -> [lastPrice],
- * `chg` -> [change] (signed points vs previous close), `pcp` -> [percentChange]
- * (percent vs previous close), `pp` -> [previousClose] and `min_step` ->
- * [minStep] (the security's minimum price increment; live-verified to arrive
- * only on a ticker's first frame, like [exchange] and [name]).
+ * A partial quote update from the Tradernet `q` frame: every field except [ticker] is nullable and
+ * only changed fields are present. `min_step` ([minStep]), [exchange] and [name] arrive only on a
+ * ticker's first frame.
  */
 data class Quote(
     val ticker: String,

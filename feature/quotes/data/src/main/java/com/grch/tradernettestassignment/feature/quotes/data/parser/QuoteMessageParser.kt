@@ -24,14 +24,7 @@ internal fun QuotePayloadDto.toQuote(): Quote? {
     )
 }
 
-/**
- * Builds the one-and-only subscription text frame for the `quotes` event.
- *
- * The official page's browser helper shows an invalid two-argument
- * `ws.send("quotes", ...)` call (not a WebSocket API). The value that must be
- * sent is the serialized array `["quotes", ["<ticker>", ...]]` as a single text
- * frame, which is what this produces.
- */
+/** Builds the subscription frame `["quotes", ["<ticker>", ...]]` as a single text frame. */
 internal fun subscriptionFrame(tickers: List<String>): String {
     val tickerArray = JSONArray().apply { tickers.forEach(::put) }
     return JSONArray().apply {
@@ -40,16 +33,7 @@ internal fun subscriptionFrame(tickers: List<String>): String {
     }.toString()
 }
 
-/**
- * Parses a raw Tradernet socket message into a [Quote], or returns `null` when
- * the message is not a `q` quote payload.
- *
- * Observed envelope: `["q", { ...named fields... }, "wstm=..."]`. The quote
- * payload at index 1 is a single JSON object. The official page's browser helper
- * calls `data.forEach` and is annotated `QuoteInfoAnswer[]`, which implies an
- * array; a live capture confirms the object form, so only the object form is
- * supported here.
- */
+/** Parses a socket message of the form `["q", {...}, "wstm=..."]` into a [Quote], or `null` if it is not a `q` payload. */
 internal class QuoteMessageParser @Inject constructor(
     private val quoteFrameAdapter: JsonAdapter<QuoteFrameDto>,
 ) {
@@ -66,7 +50,7 @@ internal class QuoteMessageParser @Inject constructor(
 
 private const val QUOTES_EVENT = "q"
 
-/** Moshi adapter for the documented/live-verified `event, payload, metadata` tuple. */
+/** Moshi adapter for the `event, payload, metadata` tuple. */
 internal class QuoteFrameJsonAdapter(
     private val payloadAdapter: JsonAdapter<QuotePayloadDto>,
 ) : JsonAdapter<QuoteFrameDto>() {
